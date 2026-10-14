@@ -106,9 +106,9 @@ def test_each_type_accepts_its_bounds(ctype, ports) -> None:
 
 
 def test_a_type_spelled_in_another_case_is_counted_as_no_type() -> None:
-    assert (
-        create_refusal("AGENT", _p("IN")).message == "AGENT must have exactly 1 IN port (found 0)"
-    )
+    agent = create_refusal("AGENT", _p("IN"))
+    assert agent is not None
+    assert agent.message == "AGENT must have exactly 1 IN port (found 0)"
     refusal = create_refusal("START", _p("external_in", "out", "EXTERNAL_IN"))
     assert refusal == ("START must have exactly 2 ports (EXTERNAL_IN and OUT), found 3", None, 3)
 

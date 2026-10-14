@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -113,7 +114,7 @@ def test_an_unreadable_record_is_refused(tmp_path: Path, monkeypatch: pytest.Mon
     script = _imported(tmp_path, manifest=MANIFEST_IN_ONLY)
     read_text = Path.read_text
 
-    def denied(self: Path, *args: object, **kwargs: object) -> str:
+    def denied(self: Path, *args: Any, **kwargs: Any) -> str:
         if self.name == "shield.component.json":
             raise OSError(errno.EACCES, os.strerror(errno.EACCES), str(self))
         return read_text(self, *args, **kwargs)
@@ -177,7 +178,7 @@ def test_a_record_with_no_port_rows_stands(tmp_path: Path) -> None:
     assert any("IN port" in message for message in _port_errors(report))
 
 
-def _with_rows(script: Path, rows: list) -> None:
+def _with_rows(script: Path, rows: object) -> None:
     record_path = script.with_name("shield.component.json")
     record = json.loads(record_path.read_text(encoding="utf-8"))
     record["component"]["ports"] = rows

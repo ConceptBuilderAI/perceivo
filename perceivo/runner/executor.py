@@ -12,7 +12,7 @@ import logging
 from contextvars import ContextVar
 from pathlib import Path as _Path
 from time import perf_counter as _perf_counter
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 # Aliased private so they do not become public members of this module.
 from .._internal.packages import missing_packages as _missing_packages
@@ -274,7 +274,8 @@ class _OrchestrationExecutor:
             # A node that returns no artifact clears the one carried on.
             if "artifact" in start_result:
                 artifact = start_result["artifact"]
-            request_data = start_result.get("response_data")
+            # START may return no response_data; the node after it then gets None.
+            request_data = cast("dict[str, Any]", start_result.get("response_data"))
 
         self._start_artifact = artifact
         artifact, request_data = await self._walk_mainflow(artifact, request_data, artifacts)

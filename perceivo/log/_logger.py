@@ -45,6 +45,12 @@ async def flush_pending_writes() -> None:
     """
     loop = asyncio.get_running_loop()
     while True:
+        # A finished task leaves the set through a done callback that runs only
+        # when the loop next turns. From Python 3.12, gather() over futures that
+        # are already done completes without yielding, so those callbacks never
+        # run and the loop would spin forever. Drop finished tasks here instead.
+        finished = [task for task in _background_tasks if task.done()]
+        _background_tasks.difference_update(finished)
         pending = [task for task in _background_tasks if task.get_loop() is loop]
         if not pending:
             return

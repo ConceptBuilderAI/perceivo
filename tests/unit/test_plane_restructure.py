@@ -190,7 +190,7 @@ def local_runtime():
 
 @pytest.mark.asyncio
 async def test_stream_token_returns_none_under_the_local_runtime(local_runtime) -> None:
-    assert await perceivo.stream.token("hello") is None
+    assert await perceivo.stream.token("hello") is None  # type: ignore[func-returns-value]
 
 
 @pytest.mark.asyncio

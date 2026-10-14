@@ -47,7 +47,7 @@ _EXTERNAL_PORT = {
 
 def _component(project: Path, stem: str, ctype: str) -> None:
     (project / f"{stem}.py").write_bytes(f"# {stem}\n".encode())
-    manifest = {"extension_type": ctype, "name": stem}
+    manifest: dict[str, object] = {"extension_type": ctype, "name": stem}
     if ctype in _EXTERNAL_PORT:
         section, port = _EXTERNAL_PORT[ctype]
         manifest[section] = port

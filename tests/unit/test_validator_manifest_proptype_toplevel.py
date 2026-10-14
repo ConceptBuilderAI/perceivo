@@ -127,7 +127,7 @@ def test_manifest_hyperparameter_untyped_forms_pass():
 # ── The suggestion names the spelling it was given ──────────────────────
 
 
-def _man_proptype_suggestions(manifest: str, ctype: str) -> list[str]:
+def _man_proptype_suggestions(manifest: str, ctype: str) -> list[str | None]:
     _parsed, checks = parse_manifest(textwrap.dedent(manifest), ctype)
     return [c.suggestion for c in checks if c.id.startswith("MAN-PROPTYPE")]
 

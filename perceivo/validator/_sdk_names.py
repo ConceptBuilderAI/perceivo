@@ -16,7 +16,7 @@ import ast
 import importlib
 import re
 import types
-from typing import Optional
+from typing import Optional, TypeGuard
 
 _ROOT = "perceivo"
 
@@ -96,7 +96,7 @@ def _suppresses_absence(item: ast.withitem) -> bool:
     )
 
 
-def _guards_body(node: ast.AST) -> bool:
+def _guards_body(node: ast.AST) -> TypeGuard[ast.Try | ast.With | ast.AsyncWith]:
     """Return whether ``node`` is a ``try`` or ``with`` whose body may lack a name."""
     if isinstance(node, _TRY_NODES):
         return any(_catches_absence(h) for h in node.handlers)
@@ -145,7 +145,7 @@ def _unjudged_nodes(tree: ast.Module) -> set[int]:
     for node in ast.walk(tree):
         if _guards_body(node):
             regions.extend(node.body)
-        elif _is_hasattr_call(node):
+        elif isinstance(node, ast.Call) and _is_hasattr_call(node):
             regions.extend(node.args)
         elif isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
             tested = [i for i, value in enumerate(node.values) if _tests_hasattr(value)]
@@ -157,7 +157,7 @@ def _unjudged_nodes(tree: ast.Module) -> set[int]:
                 regions.extend(body)
             elif _tests_hasattr(node.test):
                 orelse = node.orelse if isinstance(node.orelse, list) else [node.orelse]
-                regions.extend(body + orelse)
+                regions.extend([*body, *orelse])
         if future_annotations:
             regions.extend(_annotations(node))
     return {id(sub) for region in regions for sub in ast.walk(region)}
@@ -181,8 +181,8 @@ def _bind_imports(
                 if not _is_sdk_module(alias.name):
                     continue
                 module, error = _import_sdk_module(alias.name)
-                if error is not None:
-                    if judged:
+                if module is None or error is not None:
+                    if judged and error is not None:
                         failures.append((node.lineno, error))
                     continue
                 if alias.asname:

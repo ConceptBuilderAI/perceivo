@@ -37,7 +37,9 @@ _Counts = dict[Any, int]
 _Rule = Callable[[str, list[dict[str, Any]], _Counts], Optional[Refusal]]
 
 
-def _exactly_one(port_type: str, category: str, ports: list[dict[str, Any]], counts: _Counts):
+def _exactly_one(
+    port_type: str, category: str, ports: list[dict[str, Any]], counts: _Counts
+) -> Optional[Refusal]:
     found = counts.get(port_type, 0)
     if found == 1:
         return None
@@ -47,7 +49,7 @@ def _exactly_one(port_type: str, category: str, ports: list[dict[str, Any]], cou
 
 def _at_most(
     high: int, port_type: str, category: str, ports: list[dict[str, Any]], counts: _Counts
-):
+) -> Optional[Refusal]:
     found = counts.get(port_type, 0)
     if found <= high:
         return None
@@ -62,14 +64,16 @@ def _none(
     ports: list[dict[str, Any]],
     counts: _Counts,
     message: Optional[str] = None,
-):
+) -> Optional[Refusal]:
     found = counts.get(port_type, 0)
     if found == 0:
         return None
     return Refusal(message or f"{category} cannot have {port_type.upper()} ports", port_type, found)
 
 
-def _total(pair: str, category: str, ports: list[dict[str, Any]], counts: _Counts):
+def _total(
+    pair: str, category: str, ports: list[dict[str, Any]], counts: _Counts
+) -> Optional[Refusal]:
     if len(ports) == 2:
         return None
     return Refusal(
@@ -77,7 +81,7 @@ def _total(pair: str, category: str, ports: list[dict[str, Any]], counts: _Count
     )
 
 
-def _no_ports(category: str, ports: list[dict[str, Any]], counts: _Counts):
+def _no_ports(category: str, ports: list[dict[str, Any]], counts: _Counts) -> Optional[Refusal]:
     """Any port at all, whatever its type or direction."""
     if not ports:
         return None
@@ -93,13 +97,17 @@ def _review_out_message(found: int) -> str:
     )
 
 
-def _review_out_direction(category: str, ports: list[dict[str, Any]], counts: _Counts):
+def _review_out_direction(
+    category: str, ports: list[dict[str, Any]], counts: _Counts
+) -> Optional[Refusal]:
     """Any port whose direction is not IN, whatever its type; an absent one reads as IN."""
     found = sum(1 for p in ports if str(p.get("direction") or "IN").upper() != "IN")
     return Refusal(_review_out_message(found), None, found) if found else None
 
 
-def _review_out_type(category: str, ports: list[dict[str, Any]], counts: _Counts):
+def _review_out_type(
+    category: str, ports: list[dict[str, Any]], counts: _Counts
+) -> Optional[Refusal]:
     found = counts.get("out", 0)
     return Refusal(_review_out_message(found), "out", found) if found else None
 

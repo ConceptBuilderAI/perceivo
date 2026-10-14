@@ -109,7 +109,7 @@ def deserialize_artifact(data: bytes, artifact_type: str) -> Any:
 
         return torch.load(io.BytesIO(data), weights_only=(artifact_type == "pytorch_state_dict"))
     if artifact_type == "numpy":
-        import numpy as np
+        import numpy as np  # type: ignore[import-not-found,unused-ignore]
 
         return np.load(io.BytesIO(data), allow_pickle=False)
     if artifact_type == "joblib":

@@ -48,7 +48,9 @@ def test_ci_enforces_strict_installed_consumer_typing_examples() -> None:
     assert "python -m mypy --strict tests/typing" in workflow
     typing_example = ROOT / "tests" / "typing" / "authoring_contract.py"
     assert typing_example.is_file()
-    assert "perceivo.orchestration.list_templates()" in typing_example.read_text(encoding="utf-8")
+    assert "perceivo.orchestration.list_orchestrations()" in typing_example.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_notice_preserves_both_existing_attributions() -> None:

@@ -35,7 +35,7 @@ def _config(directory: Path, **values: str) -> Path:
 
 
 @pytest.fixture
-def tree(tmp_path, monkeypatch) -> Path:
+def tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.delenv("PERCEIVO_HOME", raising=False)
     monkeypatch.delenv("PERCEIVO_CONFIG", raising=False)
     elsewhere = tmp_path / "elsewhere"

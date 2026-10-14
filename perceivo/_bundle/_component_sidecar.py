@@ -167,5 +167,5 @@ def _recorded_fields(record: Path) -> dict[str, Any] | None:
 
 def _same_component(recorded: dict[str, Any], component: ComponentExportData) -> bool:
     if recorded.get("asset_id") and component.asset_id:
-        return recorded["asset_id"] == component.asset_id
+        return bool(recorded["asset_id"] == component.asset_id)
     return recorded.get("name") == component.name

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -110,7 +111,7 @@ def _link_directory(link: Path, target: Path) -> None:
     try:
         os.symlink(target, link, target_is_directory=True)
     except OSError:
-        if os.name != "nt":
+        if sys.platform != "win32":
             raise
         import _winapi
 

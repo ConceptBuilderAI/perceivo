@@ -155,6 +155,7 @@ def test_a_node_naming_no_manifest_reads_the_one_export_reads(tmp_path: Path) ->
     script = _component(tmp_path, HEAD + PORTS)
     _orchestration(tmp_path, "")
     loaded = _load_from_directory(str(tmp_path))
+    assert loaded is not None
     exported = component_to_bundle(script)["component"]["manifest_yaml"]
     assert exported == HEAD + PORTS
     assert loaded["components"][0]["manifest_yaml"] == exported
@@ -166,6 +167,7 @@ def test_a_node_manifest_is_read_as_export_reads_it(tmp_path: Path) -> None:
     script = _component(tmp_path, crlf)
     _orchestration(tmp_path, "    manifest: shield.yaml\n")
     loaded = _load_from_directory(str(tmp_path))
+    assert loaded is not None
     exported = component_to_bundle(script)["component"]["manifest_yaml"]
     assert exported == crlf
     assert loaded["components"][0]["manifest_yaml"] == exported

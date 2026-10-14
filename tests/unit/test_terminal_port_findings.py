@@ -102,6 +102,7 @@ def test_a_manifest_only_external_port_is_accepted(tmp_path: Path) -> None:
         yaml.safe_load((project / "orchestration.yaml").read_text(encoding="utf-8"))["ports"],
         "node_start",
     )
+    assert rows is not None
     assert [c.message for c in validate_port_rules("START", rows)] == [
         "START must have exactly 1 EXTERNAL_IN port (found 0)"
     ]

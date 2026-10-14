@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import perceivo
 from perceivo import secrets
 
@@ -15,9 +17,9 @@ def echo_agent_input(input: perceivo.AgentInput) -> perceivo.AgentOutput:
     )
 
 
-def available_templates() -> list[dict[str, str]]:
+def local_orchestrations() -> list[dict[str, Any]]:
     """Reach the typed lazy orchestration module through the root package."""
-    return perceivo.orchestration.list_templates()
+    return perceivo.orchestration.list_orchestrations()
 
 
 def make_policy_decision(input: perceivo.PolicyInput) -> perceivo.PolicyOutput:
