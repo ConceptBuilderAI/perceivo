@@ -1,0 +1,62 @@
+extension_type: AGENT
+name: Expert
+description: Answers the question in the voice of the requested profession, using ChatGPT.
+tags:
+  - beginner
+  - agent
+  - openai
+input_ports:
+  - port_name: input
+    port_type: in
+    artifact_type_input: text
+    artifact_type_output: text
+    request_data:
+      profession:
+        type: string
+        description: The profession the expert speaks as.
+      question:
+        type: string
+        description: The question to answer.
+    response_data:
+      answer:
+        type: string
+        description: The expert's reply.
+      model:
+        type: string
+        description: The model that wrote the reply.
+      provider:
+        type: string
+        description: The model provider (openai).
+      tokens_in:
+        type: integer
+        description: Prompt tokens the call used.
+      tokens_out:
+        type: integer
+        description: Completion tokens the call used.
+output_ports:
+- port_name: output
+  port_type: out
+  artifact_type_input: text
+  artifact_type_output: text
+  response_data:
+    answer:
+      type: string
+      description: The expert's reply.
+    model:
+      type: string
+      description: The model that wrote the reply.
+    provider:
+      type: string
+      description: The model provider (openai).
+    tokens_in:
+      type: integer
+      description: Prompt tokens the call used.
+    tokens_out:
+      type: integer
+      description: Completion tokens the call used.
+input_parameters: []
+required_secrets:
+  - name: OPENAI_API_KEY
+    label: OpenAI API key
+    description: Your OpenAI API key. The agent reads it at run time; it is never stored in the component.
+    required: true

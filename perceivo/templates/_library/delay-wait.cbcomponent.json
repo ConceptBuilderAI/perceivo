@@ -1,0 +1,133 @@
+{
+  "component": {
+    "additional_packages": null,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "asset_id": null,
+    "category": "ADAPTER",
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "clock"
+      },
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "delay_seconds",
+            "type": "number",
+            "label": "Delay (seconds)",
+            "default": 5,
+            "constraints": {
+              "min": 0,
+              "max": 3600,
+              "step": 0.1
+            },
+            "description": "Fixed pause length. Clamped to a maximum of 3600 seconds."
+          },
+          {
+            "name": "delay_source",
+            "type": "select",
+            "label": "Delay Source",
+            "options": [
+              "fixed",
+              "from_field"
+            ],
+            "default": "fixed",
+            "description": "Use the fixed delay, or read the duration from an input field."
+          },
+          {
+            "name": "delay_field",
+            "type": "text",
+            "label": "Delay Field",
+            "default": "",
+            "description": "Name of the request_data field holding the delay in seconds.",
+            "depends_on": {
+              "parameter": "delay_source",
+              "visible_when": [
+                "from_field"
+              ]
+            }
+          }
+        ],
+        "values": {
+          "delay_field": "",
+          "delay_seconds": 5,
+          "delay_source": "fixed"
+        }
+      },
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "detected_endpoints": []
+    },
+    "description": "What it does Pauses for a set time and then carries on, forwarding everything it received untouched. It is the pause button of a flow.\n\nHow it works Waits for the configured number of seconds, then passes its input straight through. The duration can be a fixed value you set, or read from a field in the data at run time - so an upstream component can decide how long to wait, for example by returning a retry-after value from an API. A field that is missing, negative or not a number falls back to the fixed delay, and the output says which was used. Every pause is capped at one hour. A bad setting - an unknown Delay Source, a fixed delay that is not a number of seconds, or from_field with no Delay Field - stops the run before the pause.\n\nConfigure\n- Delay (seconds) - how long to wait. 5 by default, 0 to 3600. Used when Delay Source is fixed, and as the fallback.\n- Delay Source - fixed (default) uses the value above; from_field reads it from the data.\n- Delay Field - which field holds the duration, when Delay Source is from_field. It is looked up in the request data first, then in a JSON artifact's data.\n\nIn and out In: anything. Out: the same data, file and artifacts, after the wait, plus four fields describing the pause: delay_seconds (the pause taken), delay_source, delay_from_field and delay_completed.\n\nUse it when\n- An external API rate-limits you and you need to space out calls.\n- You are polling for a result and want a gap between checks.\n- You need a cool-down between retries, or a recovery pause in an Error Handler flow.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: adapter\nname: Delay / Wait\ndescription: >\n  Pauses execution for a configurable duration, then forwards everything it\n  received unchanged. Use it for rate limiting, polling patterns, cool-down\n  between retries, or as the recovery slot of an Error Handler.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The script reads input.artifact only through a guard\n    # (`getattr(input.artifact, \"data\", None) if input.artifact else None`), to\n    # find Delay Field when request_data lacks it, and then forwards it\n    # untouched, so an artifact is welcome but never required.\n    artifact_type_input: optional(json)\n    artifact_type_output: optional(json)\n    # Everything received is forwarded unchanged (`{**request_data, ...}`) in\n    # addition to the four diagnostic fields declared below.\n    response_data_passthrough: request_data\n    response_data:\n      delay_seconds: float - Seconds actually slept, after clamping to [0, 3600].\n      delay_source: string - Which duration was used, \"fixed\" or \"from_field\".\n      delay_from_field: boolean - True when the duration was read from delay_field.\n      delay_completed: boolean - Always true once the pause finished.\n\ninput_parameters:\n  - name: delay_seconds\n    type: number\n    label: Delay (seconds)\n    default: 5\n    constraints:\n      min: 0\n      max: 3600\n      step: 0.1\n    description: Fixed pause length. Clamped to a maximum of 3600 seconds.\n  - name: delay_source\n    type: select\n    label: Delay Source\n    options: [fixed, from_field]\n    default: fixed\n    description: Use the fixed delay, or read the duration from an input field.\n  - name: delay_field\n    type: text\n    label: Delay Field\n    default: \"\"\n    description: Name of the request_data field holding the delay in seconds.\n    depends_on:\n      parameter: delay_source\n      visible_when: [from_field]\n",
+    "name": "DELAY / WAIT (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "optional(json)",
+        "artifact_types": [
+          "none"
+        ],
+        "base_schema": null,
+        "contract": {},
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "multi_artifact": false,
+        "port_type": "in",
+        "post_tool_contract": null,
+        "request_data_schema": null,
+        "response_data_passthrough": "request_data",
+        "response_data_passthrough_except": null,
+        "response_data_schema": {
+          "delay_seconds": {
+            "type": "float",
+            "required": true,
+            "description": "Seconds actually slept, after clamping to [0, 3600]."
+          },
+          "delay_source": {
+            "type": "string",
+            "required": true,
+            "description": "Which duration was used, \"fixed\" or \"from_field\"."
+          },
+          "delay_from_field": {
+            "type": "boolean",
+            "required": true,
+            "description": "True when the duration was read from delay_field."
+          },
+          "delay_completed": {
+            "type": "boolean",
+            "required": true,
+            "description": "Always true once the pause finished."
+          }
+        },
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "import asyncio\nimport math\n\nimport perceivo\n\n# Hard ceiling so a runaway value cannot park a worker for hours.\n_MAX_DELAY_SECONDS = 3600.0\n_DEFAULT_DELAY_SECONDS = 5.0\n_SOURCES = (\"fixed\", \"from_field\")\n\n\ndef _seconds(raw) -> float | None:\n    \"\"\"raw as a finite, non-negative number of seconds, or None when it is not one.\n\n    bool is a subclass of int, so True would otherwise become a 1-second delay;\n    it is refused explicitly.\n    \"\"\"\n    if raw is None or isinstance(raw, bool):\n        return None\n    try:\n        parsed = float(str(raw).strip()) if isinstance(raw, str) else float(raw)\n    except (TypeError, ValueError):\n        return None\n    if not math.isfinite(parsed) or parsed < 0:\n        return None\n    return parsed\n\n\n@perceivo.adapter\nasync def delay_wait(input: perceivo.primitives.AdapterInput) -> perceivo.primitives.AdapterOutput:\n    \"\"\"Pause the flow for a configured duration, then pass the data through.\n\n    The delay is either the fixed Delay (seconds) or, with Delay Source\n    from_field, read from the named field of request_data (or of a JSON\n    artifact's data). A field that is missing or not a usable number falls back\n    to the fixed delay, and delay_from_field says which one was used. Every\n    delay is capped at 3600 seconds. A bad setting raises ValueError before the\n    pause. request_data and the artifact are forwarded unchanged, with four\n    diagnostic fields added to request_data.\n    \"\"\"\n    delay_source = str(perceivo.params.get(\"delay_source\", \"fixed\") or \"fixed\").strip().lower()\n    if delay_source not in _SOURCES:\n        raise ValueError(f\"Delay Source is {delay_source!r}. Choose one of: {', '.join(_SOURCES)}.\")\n\n    raw_delay = perceivo.params.get(\"delay_seconds\", _DEFAULT_DELAY_SECONDS)\n    if raw_delay is None or str(raw_delay).strip() == \"\":\n        raw_delay = _DEFAULT_DELAY_SECONDS\n    delay_seconds = _seconds(raw_delay)\n    if delay_seconds is None:\n        raise ValueError(\n            f\"Delay (seconds) must be a number of seconds, 0 or more; got {raw_delay!r}.\"\n        )\n\n    delay_field = str(perceivo.params.get(\"delay_field\", \"\") or \"\").strip()\n    if delay_source == \"from_field\" and not delay_field:\n        raise ValueError(\"Delay Source is from_field but Delay Field is blank. Name the field.\")\n\n    request_data = input.request_data or {}\n    if not isinstance(request_data, dict):\n        raise ValueError(\"request_data must be an object.\")\n\n    delay_from_field = False\n    if delay_source == \"from_field\":\n        artifact_data = getattr(input.artifact, \"data\", None) if input.artifact else None\n        if delay_field in request_data:\n            raw_field = request_data[delay_field]\n        elif isinstance(artifact_data, dict):\n            raw_field = artifact_data.get(delay_field)\n        else:\n            raw_field = None\n        from_field = _seconds(raw_field)\n        if from_field is None:\n            perceivo.log.warning(\n                f\"Delay / Wait: field {delay_field!r} is missing or not a usable number; \"\n                f\"using the fixed delay of {delay_seconds}s.\"\n            )\n        else:\n            delay_seconds = from_field\n            delay_from_field = True\n\n    delay_seconds = min(delay_seconds, _MAX_DELAY_SECONDS)\n\n    perceivo.log.info(\n        f\"Delay / Wait: pausing {delay_seconds}s\",\n        delay_seconds=delay_seconds,\n        delay_source=delay_source,\n        delay_from_field=delay_from_field,\n    )\n    await asyncio.sleep(delay_seconds)\n    perceivo.log.info(f\"Delay / Wait: resumed after {delay_seconds}s\")\n\n    return perceivo.primitives.AdapterOutput(\n        artifact=input.artifact,\n        response_data={\n            **request_data,\n            \"delay_seconds\": delay_seconds,\n            \"delay_source\": delay_source,\n            \"delay_from_field\": delay_from_field,\n            \"delay_completed\": True,\n        },\n        artifacts=input.artifacts or {},\n    )\n",
+    "short_description": "Pauses the flow for a fixed or data-driven number of seconds, then passes everything through unchanged.",
+    "tags": [
+      "template",
+      "control-flow",
+      "delay"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-07-18T00:00:00Z"
+}

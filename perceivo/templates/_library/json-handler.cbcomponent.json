@@ -1,0 +1,327 @@
+{
+  "component": {
+    "additional_packages": null,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "asset_id": null,
+    "category": "ADAPTER",
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "code"
+      },
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "operation",
+            "type": "select",
+            "label": "Operation",
+            "options": [
+              "extract",
+              "filter",
+              "transform",
+              "aggregate",
+              "sort",
+              "select_fields",
+              "normalize"
+            ],
+            "default": "filter",
+            "required": true,
+            "description": "The single operation this node performs."
+          },
+          {
+            "name": "array_path",
+            "type": "text",
+            "label": "Array Path",
+            "required": true,
+            "description": "Dot-notation path to the list inside the incoming data, e.g. results.items."
+          },
+          {
+            "name": "filter_field",
+            "type": "text",
+            "label": "Filter Field",
+            "description": "The record field the filter tests.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "filter"
+              ]
+            }
+          },
+          {
+            "name": "filter_operator",
+            "type": "select",
+            "label": "Filter Operator",
+            "options": [
+              "equals",
+              "not_equals",
+              "contains",
+              "gt",
+              "lt",
+              "gte",
+              "lte"
+            ],
+            "default": "equals",
+            "description": "gt, lt, gte and lte compare numbers; equals compares numbers as numbers and anything else as text.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "filter"
+              ]
+            }
+          },
+          {
+            "name": "filter_value",
+            "type": "text",
+            "label": "Filter Value",
+            "description": "The value the field is compared with.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "filter"
+              ]
+            }
+          },
+          {
+            "name": "transform_field",
+            "type": "text",
+            "label": "Transform Field",
+            "description": "The record field to change.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "transform"
+              ]
+            }
+          },
+          {
+            "name": "transform_op",
+            "type": "select",
+            "label": "Transform Operation",
+            "options": [
+              "add",
+              "multiply",
+              "uppercase",
+              "lowercase",
+              "trim",
+              "prefix",
+              "suffix"
+            ],
+            "default": "uppercase",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "transform"
+              ]
+            }
+          },
+          {
+            "name": "transform_value",
+            "type": "text",
+            "label": "Transform Operand",
+            "description": "The number for add and multiply, or the text for prefix and suffix.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "transform"
+              ]
+            }
+          },
+          {
+            "name": "aggregate_field",
+            "type": "text",
+            "label": "Aggregate Field",
+            "description": "The numeric record field to reduce. Not needed for count.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "aggregate"
+              ]
+            }
+          },
+          {
+            "name": "aggregate_function",
+            "type": "select",
+            "label": "Aggregate Function",
+            "options": [
+              "sum",
+              "avg",
+              "min",
+              "max",
+              "count"
+            ],
+            "default": "sum",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "aggregate"
+              ]
+            }
+          },
+          {
+            "name": "sort_field",
+            "type": "text",
+            "label": "Sort Field",
+            "description": "The record field to order by. Numbers sort before text; records without it go last.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "sort"
+              ]
+            }
+          },
+          {
+            "name": "sort_direction",
+            "type": "select",
+            "label": "Sort Direction",
+            "options": [
+              "ascending",
+              "descending"
+            ],
+            "default": "ascending",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "sort"
+              ]
+            }
+          },
+          {
+            "name": "select_fields",
+            "type": "text",
+            "label": "Fields To Keep",
+            "description": "Comma-separated field names.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "select_fields"
+              ]
+            }
+          },
+          {
+            "name": "normalize_field",
+            "type": "text",
+            "label": "Normalize Field",
+            "description": "The numeric record field to rescale.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "normalize"
+              ]
+            }
+          },
+          {
+            "name": "normalize_min",
+            "type": "number",
+            "label": "Range Minimum",
+            "default": 0,
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "normalize"
+              ]
+            }
+          },
+          {
+            "name": "normalize_max",
+            "type": "number",
+            "label": "Range Maximum",
+            "default": 1,
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "normalize"
+              ]
+            }
+          }
+        ],
+        "values": {
+          "aggregate_field": "",
+          "aggregate_function": "sum",
+          "array_path": "",
+          "filter_field": "",
+          "filter_operator": "equals",
+          "filter_value": "",
+          "normalize_field": "",
+          "normalize_max": 1,
+          "normalize_min": 0,
+          "operation": "filter",
+          "select_fields": "",
+          "sort_direction": "ascending",
+          "sort_field": "",
+          "transform_field": "",
+          "transform_op": "uppercase",
+          "transform_value": ""
+        }
+      },
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      }
+    },
+    "description": "What it does Reshapes a list of records inside your data: filtering it, sorting it, changing a field on every record, keeping only some fields, rescaling a number, or reducing the list to a single number. One node performs one operation; chain several to build a pipeline you can follow on the canvas.\n\nHow it works Point Array Path at a list in the incoming data, choose the operation, then fill in that operation's fields only - the rest are ignored. The result is added to the data as result, with operation and item_count, and everything that arrived passes through, so components downstream still see the fields they expected. A setting that is missing or not one of the choices, or an Array Path that finds nothing or no list, fails the run with a message saying which, instead of quietly passing the data on unchanged.\n\nConfigure\nStart with Operation and Array Path, then only that operation's fields:\n- filter (default) - keep matching records. Field, operator (equals, not_equals, contains, gt, lt, gte, lte) and value.\n- extract - return whatever sits at Array Path.\n- transform - change a field on every record. Field, operation (add, multiply, uppercase, lowercase, trim, prefix, suffix) and operand.\n- aggregate - reduce the list to one number. Field and function (sum, avg, min, max, count).\n- sort - order the records. Field and direction (ascending by default). Records without the field go last.\n- select_fields - keep only the fields you name, comma-separated.\n- normalize - rescale a numeric field into a range. Field, minimum (0) and maximum (1).\n\nIn and out In: data containing a list at Array Path. Out: the same data plus result (the reshaped list, or for aggregate the single value), operation and item_count.\n\nUse it when\n- An API returned far more rows than you need and you want the ones that matter.\n- You need a total, average or count before a decision step.\n- A model expects records in a particular order, or with fewer fields than you have.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: adapter\nname: JSON Handler\ndescription: >\n  Applies one operation - extract, filter, transform, aggregate, sort,\n  select_fields or normalize - to the list at Array Path inside request_data\n  and adds the result to the data. One operation per node; chain several\n  nodes for a multi-step pipeline. A misconfigured node, or an Array Path that\n  finds no list, raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The artifact is forwarded straight into the Output constructor and is\n    # never dereferenced, so it is welcome but never required.\n    artifact_type_input: optional(json)\n    artifact_type_output: optional(json)\n    # The list is located by the array_path parameter rather than a fixed\n    # field name, so no specific inbound key can honestly be declared required.\n    # The Output spreads its inbound request_data first\n    # (`{**request_data, ...}`), so upstream context survives the hop. Nothing\n    # is popped, so there is no _except list.\n    response_data_passthrough: request_data\n    response_data:\n      result: object - The operation's output. A list for every operation except aggregate (a number, or null for avg/min/max of no numbers) and extract (whatever sits at Array Path).\n      operation: string - The operation that ran.\n      item_count: integer - Length of result when it is a list, otherwise 0.\n\ninput_parameters:\n  - name: operation\n    type: select\n    label: Operation\n    options: [extract, filter, transform, aggregate, sort, select_fields, normalize]\n    default: filter\n    required: true\n    description: The single operation this node performs.\n  - name: array_path\n    type: text\n    label: Array Path\n    required: true\n    description: Dot-notation path to the list inside the incoming data, e.g. results.items.\n  - name: filter_field\n    type: text\n    label: Filter Field\n    description: The record field the filter tests.\n    depends_on:\n      parameter: operation\n      visible_when: [filter]\n  - name: filter_operator\n    type: select\n    label: Filter Operator\n    options: [equals, not_equals, contains, gt, lt, gte, lte]\n    default: equals\n    description: gt, lt, gte and lte compare numbers; equals compares numbers as numbers and anything else as text.\n    depends_on:\n      parameter: operation\n      visible_when: [filter]\n  - name: filter_value\n    type: text\n    label: Filter Value\n    description: The value the field is compared with.\n    depends_on:\n      parameter: operation\n      visible_when: [filter]\n  - name: transform_field\n    type: text\n    label: Transform Field\n    description: The record field to change.\n    depends_on:\n      parameter: operation\n      visible_when: [transform]\n  - name: transform_op\n    type: select\n    label: Transform Operation\n    options: [add, multiply, uppercase, lowercase, trim, prefix, suffix]\n    default: uppercase\n    depends_on:\n      parameter: operation\n      visible_when: [transform]\n  - name: transform_value\n    type: text\n    label: Transform Operand\n    description: The number for add and multiply, or the text for prefix and suffix.\n    depends_on:\n      parameter: operation\n      visible_when: [transform]\n  - name: aggregate_field\n    type: text\n    label: Aggregate Field\n    description: The numeric record field to reduce. Not needed for count.\n    depends_on:\n      parameter: operation\n      visible_when: [aggregate]\n  - name: aggregate_function\n    type: select\n    label: Aggregate Function\n    options: [sum, avg, min, max, count]\n    default: sum\n    depends_on:\n      parameter: operation\n      visible_when: [aggregate]\n  - name: sort_field\n    type: text\n    label: Sort Field\n    description: The record field to order by. Numbers sort before text; records without it go last.\n    depends_on:\n      parameter: operation\n      visible_when: [sort]\n  - name: sort_direction\n    type: select\n    label: Sort Direction\n    options: [ascending, descending]\n    default: ascending\n    depends_on:\n      parameter: operation\n      visible_when: [sort]\n  - name: select_fields\n    type: text\n    label: Fields To Keep\n    description: Comma-separated field names.\n    depends_on:\n      parameter: operation\n      visible_when: [select_fields]\n  - name: normalize_field\n    type: text\n    label: Normalize Field\n    description: The numeric record field to rescale.\n    depends_on:\n      parameter: operation\n      visible_when: [normalize]\n  - name: normalize_min\n    type: number\n    label: Range Minimum\n    default: 0\n    depends_on:\n      parameter: operation\n      visible_when: [normalize]\n  - name: normalize_max\n    type: number\n    label: Range Maximum\n    default: 1\n    depends_on:\n      parameter: operation\n      visible_when: [normalize]\n",
+    "name": "JSON HANDLER (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "optional(json)",
+        "artifact_types": [
+          "none"
+        ],
+        "base_schema": null,
+        "contract": {},
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "multi_artifact": false,
+        "port_type": "in",
+        "post_tool_contract": null,
+        "request_data_schema": null,
+        "response_data_passthrough": "request_data",
+        "response_data_passthrough_except": null,
+        "response_data_schema": {
+          "result": {
+            "type": "object",
+            "required": true,
+            "description": "The operation's output. A list for every operation except aggregate (a number, or null for avg/min/max of no numbers) and extract (whatever sits at Array Path)."
+          },
+          "operation": {
+            "type": "string",
+            "required": true,
+            "description": "The operation that ran."
+          },
+          "item_count": {
+            "type": "integer",
+            "required": true,
+            "description": "Length of result when it is a list, otherwise 0."
+          }
+        },
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "\"\"\"JSON Handler: one operation on a list of records inside request_data.\n\nOne operation per node, by design: chain several nodes for a multi-step\npipeline, so each step reads on the canvas. The list is found by Array Path,\nthe result is added to the inbound data, and a misconfigured node raises\nValueError instead of quietly passing the data on unchanged.\n\"\"\"\n\nimport perceivo\n\n_OPERATIONS = (\"extract\", \"filter\", \"transform\", \"aggregate\", \"sort\", \"select_fields\", \"normalize\")\n_FILTER_OPERATORS = (\"equals\", \"not_equals\", \"contains\", \"gt\", \"lt\", \"gte\", \"lte\")\n_TRANSFORM_OPS = (\"add\", \"multiply\", \"uppercase\", \"lowercase\", \"trim\", \"prefix\", \"suffix\")\n_AGGREGATE_FUNCTIONS = (\"sum\", \"avg\", \"min\", \"max\", \"count\")\n_SORT_DIRECTIONS = (\"ascending\", \"descending\")\n_TRUE, _FALSE = (\"true\", \"1\", \"yes\", \"y\", \"on\"), (\"false\", \"0\", \"no\", \"n\", \"off\")\n_ABSENT = object()\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    \"\"\"A text node parameter. An explicit 0 stays \"0\"; only None or \"\" fall back.\"\"\"\n    value = perceivo.params.get(name, default)\n    if value is None or str(value).strip() == \"\":\n        return default\n    return str(value).strip()\n\n\ndef _choice(name: str, label: str, default: str, choices: tuple) -> str:\n    value = _param(name, default).lower()\n    if value not in choices:\n        raise ValueError(f\"{label} is {value!r}. Choose one of: {', '.join(choices)}.\")\n    return value\n\n\ndef _required(name: str, label: str, operation: str) -> str:\n    value = _param(name)\n    if not value:\n        raise ValueError(f\"{label} is required for the {operation} operation.\")\n    return value\n\n\ndef _number_param(name: str, label: str, default: float) -> float:\n    raw = _param(name, str(default))\n    try:\n        return float(raw)\n    except ValueError:\n        raise ValueError(f\"{label} is {raw!r}; it must be a number.\") from None\n\n\ndef _resolve_path(data, dotted_path: str):\n    \"\"\"Walk a dot-notation path through nested dicts, or _ABSENT.\"\"\"\n    current = data\n    for part in dotted_path.split(\".\"):\n        if not isinstance(current, dict) or part not in current:\n            return _ABSENT\n        current = current[part]\n    return current\n\n\ndef _as_number(value):\n    \"\"\"The value as an int or float, or None when it is not numeric. Booleans are not numbers.\"\"\"\n    if isinstance(value, bool) or value is None:\n        return None\n    if isinstance(value, (int, float)):\n        return value\n    text = str(value).strip()\n    try:\n        return int(text)\n    except ValueError:\n        pass\n    try:\n        return float(text)\n    except ValueError:\n        return None\n\n\ndef _compare(left, operator: str, right: str) -> bool:\n    \"\"\"Evaluate one filter predicate against the configured value (always text).\n\n    gt/lt/gte/lte compare numbers only, so a record whose field is not numeric\n    never matches them. equals compares numbers as numbers (\"2\" equals 2.0),\n    booleans against true/false/yes/no, a missing or null field as empty text,\n    and anything else as text. contains matches a substring of text, or an\n    element of a list.\n    \"\"\"\n    if operator == \"contains\":\n        if isinstance(left, list):\n            return any(str(item) == right for item in left)\n        return right in (\"\" if left is None else str(left))\n    left_number, right_number = _as_number(left), _as_number(right)\n    if operator in (\"gt\", \"lt\", \"gte\", \"lte\"):\n        if left_number is None or right_number is None:\n            return False\n        return {\n            \"gt\": left_number > right_number,\n            \"lt\": left_number < right_number,\n            \"gte\": left_number >= right_number,\n            \"lte\": left_number <= right_number,\n        }[operator]\n    if isinstance(left, bool) and right.lower() in _TRUE + _FALSE:\n        equal = left == (right.lower() in _TRUE)\n    elif left_number is not None and right_number is not None:\n        equal = left_number == right_number\n    else:\n        equal = (\"\" if left is None else str(left)) == right\n    return equal if operator == \"equals\" else not equal\n\n\ndef _filter(items, field, operator, value):\n    \"\"\"Keep the records whose field satisfies the predicate.\"\"\"\n    return [i for i in items if isinstance(i, dict) and _compare(i.get(field), operator, value)]\n\n\ndef _transform(items, field, operation, operand):\n    \"\"\"Copies of the records with field transformed.\n\n    add and multiply leave a value that is not a number as it is; the text\n    operations treat a missing field as empty text.\n    \"\"\"\n    if operation in (\"add\", \"multiply\"):\n        delta = _as_number(operand)\n        if delta is None:\n            raise ValueError(f\"Transform Operand is {operand!r}; {operation} needs a number.\")\n    result, skipped = [], 0\n    for item in items:\n        if not isinstance(item, dict):\n            result.append(item)\n            continue\n        updated = dict(item)\n        current = item.get(field)\n        if operation in (\"add\", \"multiply\"):\n            base = _as_number(current)\n            if base is None:\n                skipped += 1\n            else:\n                updated[field] = base + delta if operation == \"add\" else base * delta\n        else:\n            text = \"\" if current is None else str(current)\n            updated[field] = {\n                \"uppercase\": text.upper,\n                \"lowercase\": text.lower,\n                \"trim\": text.strip,\n                \"prefix\": lambda: f\"{operand}{text}\",\n                \"suffix\": lambda: f\"{text}{operand}\",\n            }[operation]()\n        result.append(updated)\n    if skipped:\n        perceivo.log.warning(\n            f\"JSON Handler: {skipped} record(s) left unchanged; {field} is not a number.\",\n            field=field,\n            skipped=skipped,\n        )\n    return result\n\n\ndef _aggregate(items, field, function):\n    \"\"\"Reduce the records to one number.\n\n    count counts the records. sum is 0 when no record has a numeric field;\n    avg, min and max are null then, because there is nothing to measure.\n    \"\"\"\n    if function == \"count\":\n        return len(items)\n    values = [\n        n for n in (_as_number(i.get(field)) for i in items if isinstance(i, dict)) if n is not None\n    ]\n    if function == \"sum\":\n        return sum(values)\n    if not values:\n        return None\n    if function == \"avg\":\n        return sum(values) / len(values)\n    return min(values) if function == \"min\" else max(values)\n\n\ndef _sort(items, field, direction):\n    \"\"\"Order the records by field: numbers before text, missing values always last.\"\"\"\n    present, missing = [], []\n    for item in items:\n        value = item.get(field) if isinstance(item, dict) else None\n        (missing if value is None else present).append(item)\n\n    def key(item):\n        value = item[field]\n        number = _as_number(value)\n        # (0, number) sorts every number before (1, text), so mixed types never raise.\n        return (0, number, \"\") if number is not None else (1, 0, str(value))\n\n    return sorted(present, key=key, reverse=direction == \"descending\") + missing\n\n\ndef _select_fields(items, wanted):\n    \"\"\"Only the named fields of each record.\"\"\"\n    return [{f: i[f] for f in wanted if f in i} if isinstance(i, dict) else i for i in items]\n\n\ndef _normalize(items, field, low, high):\n    \"\"\"Rescale a numeric field across the records into [low, high].\n\n    When every value is the same they are all placed at low. A record whose\n    field is not numeric is left as it is.\n    \"\"\"\n    values = [\n        n for n in (_as_number(i.get(field)) for i in items if isinstance(i, dict)) if n is not None\n    ]\n    if not values:\n        return [dict(i) if isinstance(i, dict) else i for i in items]\n    smallest, span = min(values), max(values) - min(values)\n    result = []\n    for item in items:\n        updated = dict(item) if isinstance(item, dict) else item\n        current = _as_number(item.get(field)) if isinstance(item, dict) else None\n        if current is not None:\n            ratio = 0.0 if span == 0 else (current - smallest) / span\n            updated[field] = low + ratio * (high - low)\n        result.append(updated)\n    return result\n\n\ndef _run(operation: str, items: list):\n    \"\"\"Read the operation's own parameters, check them, and apply it to items.\"\"\"\n    if operation == \"filter\":\n        field = _required(\"filter_field\", \"Filter Field\", operation)\n        operator = _choice(\"filter_operator\", \"Filter Operator\", \"equals\", _FILTER_OPERATORS)\n        return _filter(items, field, operator, _param(\"filter_value\"))\n    if operation == \"transform\":\n        field = _required(\"transform_field\", \"Transform Field\", operation)\n        op = _choice(\"transform_op\", \"Transform Operation\", \"uppercase\", _TRANSFORM_OPS)\n        # Not stripped: a prefix may end, or a suffix start, with a space.\n        operand = perceivo.params.get(\"transform_value\", \"\")\n        return _transform(items, field, op, \"\" if operand is None else str(operand))\n    if operation == \"aggregate\":\n        function = _choice(\"aggregate_function\", \"Aggregate Function\", \"sum\", _AGGREGATE_FUNCTIONS)\n        field = (\n            \"\"\n            if function == \"count\"\n            else _required(\"aggregate_field\", \"Aggregate Field\", operation)\n        )\n        return _aggregate(items, field, function)\n    if operation == \"sort\":\n        field = _required(\"sort_field\", \"Sort Field\", operation)\n        direction = _choice(\"sort_direction\", \"Sort Direction\", \"ascending\", _SORT_DIRECTIONS)\n        return _sort(items, field, direction)\n    if operation == \"select_fields\":\n        csv = _required(\"select_fields\", \"Fields To Keep\", operation)\n        return _select_fields(items, [f.strip() for f in csv.split(\",\") if f.strip()])\n    field = _required(\"normalize_field\", \"Normalize Field\", operation)\n    low = _number_param(\"normalize_min\", \"Range Minimum\", 0)\n    high = _number_param(\"normalize_max\", \"Range Maximum\", 1)\n    return _normalize(items, field, low, high)\n\n\n@perceivo.adapter\nasync def json_handler(\n    input: perceivo.primitives.AdapterInput,\n) -> perceivo.primitives.AdapterOutput:\n    \"\"\"Apply one configured operation to the list at Array Path.\n\n    extract returns whatever sits at the path; every other operation needs a\n    list there. The inbound request_data is spread into the result before the\n    produced fields are named, so upstream context survives; nothing is\n    removed, so there is no _except list. The artifact is forwarded straight\n    into the Output and never dereferenced, so it is welcome but never required.\n\n    A misconfigured node - an unknown operation, a missing field name, an Array\n    Path that finds nothing or no list - raises ValueError.\n    \"\"\"\n    request_data = input.request_data or {}\n    if not isinstance(request_data, dict):\n        request_data = {\"data\": request_data}\n\n    operation = _choice(\"operation\", \"Operation\", \"filter\", _OPERATIONS)\n    array_path = _param(\"array_path\")\n    if not array_path:\n        raise ValueError(\n            \"Array Path is required: the dot-notation path to the list in the incoming \"\n            f\"data, e.g. results.items. Fields received: {sorted(request_data)}.\"\n        )\n    located = _resolve_path(request_data, array_path)\n    if located is _ABSENT:\n        raise ValueError(\n            f\"Array Path {array_path!r} is not in the incoming data. \"\n            f\"Fields received: {sorted(request_data)}.\"\n        )\n\n    if operation == \"extract\":\n        result = located\n    elif isinstance(located, list):\n        result = _run(operation, located)\n    else:\n        raise ValueError(\n            f\"Array Path {array_path!r} holds {type(located).__name__}, not a list; \"\n            f\"{operation} needs a list.\"\n        )\n\n    item_count = len(result) if isinstance(result, list) else 0\n    perceivo.log.info(\n        f\"JSON Handler: {operation} at {array_path} -> \"\n        f\"{f'{item_count} item(s)' if isinstance(result, list) else 'one value'}\",\n        operation=operation,\n        item_count=item_count,\n    )\n\n    return perceivo.primitives.AdapterOutput(\n        artifact=input.artifact,\n        response_data={\n            **request_data,\n            \"result\": result,\n            \"operation\": operation,\n            \"item_count\": item_count,\n        },\n    )\n",
+    "short_description": "Reshapes a list of records - filter, sort, transform, aggregate, select fields or normalise - one operation per node.",
+    "tags": [
+      "template",
+      "adapter",
+      "json",
+      "transformation"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-10-06T00:00:00Z"
+}

@@ -1,0 +1,713 @@
+{
+  "components": {
+    "comp_0": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "05d94f0f-2b33-4747-baff-52f88b0f33b5",
+      "category": "POLICY",
+      "config": {
+        "detected_endpoints": [],
+        "is_agent_tool_internal": true
+      },
+      "description": "What it does The decision rule for the Sequential Executor: after each step it decides whether to carry on, loop again, or stop.\n\nHow it works On every pass it reads the current data, the iteration count and the exit conditions configured on the FSM, and returns the next state. It stops when an exit condition matches or the iteration ceiling is reached; otherwise it advances to the next slot. It makes no calls of its own and holds no configuration - it reads what the FSM was given.\n\nConfigure Nothing. Set the loop behaviour on the FSM instead.\n\nIn and out In: the run data, iteration count and exit conditions. Out: the next state, plus the reason when it decides to stop.\n\nUse it when It comes with the Sequential Executor template. You do not add or configure it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: policy\nname: Sequential Executor Policy\ndescription: >\n  Internal control policy for the Sequential Executor. Evaluates the configured\n  exit conditions after each loop iteration and decides whether to continue.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      data: object (optional) - The accumulated state data to test conditions against.\n      exit_conditions: array (optional) - Field/operator/value tests to evaluate.\n      iteration: integer (optional) - The iteration that just completed.\n      max_iterations: integer (optional) - Hard iteration cap.\n    response_data:\n      should_exit: boolean - True when the loop should stop.\n      exit_reason: string - Why the loop stopped, or null when it continues.\n\npolicy_states:\n  - continue\n  - exit\n",
+      "name": "SEQUENTIAL EXECUTOR - POLICY (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "data": {
+              "required": false,
+              "type": "object"
+            },
+            "exit_conditions": {
+              "required": false,
+              "type": "array"
+            },
+            "iteration": {
+              "required": false,
+              "type": "integer"
+            },
+            "max_iterations": {
+              "required": false,
+              "type": "integer"
+            }
+          },
+          "response_data_schema": {
+            "exit_reason": {
+              "required": true,
+              "type": "string"
+            },
+            "should_exit": {
+              "required": true,
+              "type": "boolean"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\ndef _get_field(data, field: str):\n    \"\"\"Get a value from data using dot-path.\"\"\"\n    keys = field.split(\".\")\n    current = data\n    for key in keys:\n        if isinstance(current, dict) and key in current:\n            current = current[key]\n        else:\n            return None\n    return current\n\n\n\ndef _evaluate(actual, operator: str, expected: str) -> bool:\n    if operator == \"is_null\":\n        return actual is None\n    if operator == \"is_not_null\":\n        return actual is not None\n    if actual is None:\n        return False\n\n    # Smart cast expected value\n    try:\n        if \".\" in expected:\n            cast_expected = float(expected)\n        else:\n            cast_expected = int(expected)\n    except (ValueError, TypeError):\n        cast_expected = expected\n\n    if operator == \"equals\":\n        return actual == cast_expected or str(actual) == str(expected)\n    elif operator == \"not_equals\":\n        return actual != cast_expected and str(actual) != str(expected)\n    elif operator == \"contains\":\n        return str(expected) in str(actual)\n    elif operator == \"greater_than\":\n        try:\n            return float(actual) > float(expected)\n        except (TypeError, ValueError):\n            return False\n    elif operator == \"less_than\":\n        try:\n            return float(actual) < float(expected)\n        except (TypeError, ValueError):\n            return False\n    elif operator == \"greater_equal\":\n        try:\n            return float(actual) >= float(expected)\n        except (TypeError, ValueError):\n            return False\n    elif operator == \"less_equal\":\n        try:\n            return float(actual) <= float(expected)\n        except (TypeError, ValueError):\n            return False\n    return False\n\n\n\n@perceivo.policy\nasync def sequential_executor_policy_internal(input: perceivo.primitives.PolicyInput) -> perceivo.primitives.PolicyOutput:\n    rd = input.request_data or {}\n    data = rd.get(\"data\", {})\n    exit_conditions = rd.get(\"exit_conditions\", [])\n    iteration = rd.get(\"iteration\", 0)\n    max_iterations = rd.get(\"max_iterations\", 10)\n\n    # Check max iterations (safety override)\n    if iteration >= max_iterations:\n        return perceivo.primitives.PolicyOutput(\n            next_state=\"exit\",\n            response_data={\n                \"should_exit\": True,\n                \"exit_reason\": f\"max_iterations ({max_iterations}) reached\",\n            },\n        )\n\n    # Evaluate user-defined exit conditions (ANY match = exit)\n    for cond in exit_conditions:\n        field = cond.get(\"field\", \"\")\n        operator = cond.get(\"operator\", \"equals\")\n        expected = cond.get(\"value\", \"\")\n\n        if not field:\n            continue\n\n        actual = _get_field(data, field)\n\n        if _evaluate(actual, operator, expected):\n            reason = f\"{field} {operator} {expected} (actual: {actual})\"\n            perceivo.log.info(f\"Exit condition met: {reason}\")\n            return perceivo.primitives.PolicyOutput(\n                next_state=\"exit\",\n                response_data={\n                    \"should_exit\": True,\n                    \"exit_reason\": reason,\n                },\n            )\n\n    return perceivo.primitives.PolicyOutput(\n        next_state=\"continue\",\n        response_data={\n            \"should_exit\": False,\n            \"exit_reason\": None,\n        },\n    )\n",
+      "short_description": "The decision rule for the Sequential Executor: after each step it decides whether to carry",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_1": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "4ed64f7d-3526-40a8-ae2d-860f4f6432af",
+      "category": "END",
+      "config": {
+        "detected_endpoints": [],
+        "is_generic_end": true,
+        "output_parameters": {
+          "declarations": [],
+          "values": {}
+        },
+        "port_order": [
+          "input",
+          "external_output"
+        ]
+      },
+      "description": "What it does The exit of the Sequential Executor template. It returns what the sequence produced.\n\nHow it works Takes the data reaching it after the final step and returns it as the result of the nested run, so the parent flow can carry on with it. It adds nothing of its own.\n\nConfigure Nothing.\n\nIn and out In: the result of the last step. Out: the same data, as the template's result.\n\nUse it when It comes with the Sequential Executor template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: json\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: json\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\n",
+      "name": "SEQUENTIAL EXECUTOR - END (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "external_output",
+          "label": "External Output",
+          "multi_artifact": false,
+          "port_type": "external_out",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.end\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data=input.response_data or {},\n    )\n",
+      "short_description": "The exit of the Sequential Executor template. It returns what the sequence produced.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_2": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "69b2c99f-9555-4c0f-b359-1a3ea7163091",
+      "category": "START",
+      "config": {
+        "detected_endpoints": [],
+        "input_parameters": {
+          "declarations": [
+            {
+              "_schema_type": "string",
+              "label": "prompt",
+              "name": "prompt",
+              "required": true,
+              "type": "text"
+            }
+          ],
+          "values": {}
+        },
+        "is_generic_start": true,
+        "port_order": [
+          "external_input",
+          "output"
+        ]
+      },
+      "description": "What it does The entry point of the Sequential Executor template. It accepts the caller's input and hands it to the first step.\n\nHow it works Passes the incoming data and any accompanying file straight through to the executor, adding nothing. It exists because every orchestration needs exactly one start; it is not something you configure.\n\nConfigure Nothing.\n\nIn and out In: the caller's request. Out: the same, unchanged, into the first state slot.\n\nUse it when It comes with the Sequential Executor template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+      "name": "SEQUENTIAL EXECUTOR - START (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "external_input",
+          "label": "External Input",
+          "multi_artifact": false,
+          "port_type": "external_in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "output",
+          "label": "Output",
+          "multi_artifact": false,
+          "port_type": "out",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.start\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    return perceivo.primitives.StartOutput(\n        artifact=input.artifact,\n        response_data=input.request_data or {},\n    )\n",
+      "short_description": "The entry point of the Sequential Executor template. It accepts the caller's input and hands",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_3": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "a3b34f65-c876-4a3e-b88b-f097b944728e",
+      "category": "FSM",
+      "config": {
+        "detected_endpoints": [],
+        "fsm": {
+          "max_steps": 1
+        },
+        "icon": {
+          "type": "lucide",
+          "value": "list-ordered"
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "default": false,
+              "description": "When enabled, states are executed repeatedly until an exit condition is met or max iterations is reached. When disabled, states are executed once in order.",
+              "label": "Enable Looping",
+              "name": "enable_looping",
+              "type": "boolean"
+            },
+            {
+              "constraints": {
+                "max": 1000,
+                "min": 1
+              },
+              "default": 10,
+              "depends_on": {
+                "parameter": "enable_looping",
+                "visible_when": [
+                  true
+                ]
+              },
+              "description": "Maximum number of loop iterations (safety limit)",
+              "label": "Max Iterations",
+              "name": "max_iterations",
+              "required": true,
+              "type": "integer"
+            },
+            {
+              "default": "[]",
+              "depends_on": {
+                "parameter": "enable_looping",
+                "visible_when": [
+                  true
+                ]
+              },
+              "description": "JSON array of exit conditions (managed by Loop Editor UI)",
+              "label": "Exit Conditions",
+              "name": "exit_conditions",
+              "type": "text_long"
+            },
+            {
+              "default": "[]",
+              "description": "JSON array of state port configurations (managed by Loop Editor UI)",
+              "label": "States Configuration",
+              "name": "states",
+              "type": "text_long"
+            },
+            {
+              "default": false,
+              "description": "Merge state outputs flat instead of namespacing under port names. Each state receives all prior outputs plus executor input.",
+              "label": "Flat Accumulation",
+              "name": "flat_accumulation",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "values": {
+            "enable_looping": false,
+            "exit_conditions": "[]",
+            "flat_accumulation": false,
+            "max_iterations": 10,
+            "states": "[{\"port_name\":\"state_1\"},{\"port_name\":\"state_2\"},{\"port_name\":\"state_3\"},{\"port_name\":\"state_4\"}]"
+          }
+        },
+        "is_sequential_executor": true,
+        "port_order": [
+          "input",
+          "policy",
+          "state_1",
+          "state_2",
+          "state_3",
+          "state_4"
+        ],
+        "port_sides": {
+          "input": "left",
+          "policy": "top",
+          "state_1": "bottom",
+          "state_2": "bottom",
+          "state_3": "bottom",
+          "state_4": "bottom"
+        }
+      },
+      "description": "What it does The engine of the Sequential Executor template. It holds the ordered steps and drives them one after another.\n\nHow it works Each state slot holds one component. The FSM runs them in order, passing each result forward, and asks its policy after every step whether to continue, loop or finish. Looping repeats the whole sequence until an exit condition matches or the iteration ceiling is hit.\n\nConfigure\n- States - the ordered slots and their components.\n- Enable looping - repeat the sequence rather than running once.\n- Max iterations - hard stop for a loop, so it cannot run away.\n- Exit conditions - field, operator and value tests that end the loop when any one matches.\n- Forward input to states - pass the original input to every step, not just the first.\n- Flat accumulation - merge results into one object instead of nesting per step.\n\nIn and out In: the run's data. Out: the last step's result, or the accumulation of all steps.\n\nUse it when It comes with the Sequential Executor template - configure it there rather than adding it on its own.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: fsm\nname: Sequential Executor\ndescription: >\n  Executes its wired state slots one after another, in order. Enable looping to\n  repeat the sequence until an exit condition is met or the iteration limit is\n  reached. Output is namespaced by slot.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: optional(json)\n    artifact_type_output: optional(json)\n    response_data_contract: dynamic\n    response_data_contract_reason: >-\n      Slot keys are the port names named by the `states` input parameter (or the\n      probed state_N ports when it is empty); only `input` is statically known.\n    response_data:\n      input: object - The executor's own inbound request_data, echoed back.\n      state_1: object (optional) - response_data returned by the state_1 slot.\n      state_2: object (optional) - response_data returned by the state_2 slot.\n      state_3: object (optional) - response_data returned by the state_3 slot.\n      state_4: object (optional) - response_data returned by the state_4 slot.\n\nstate_ports:\n  - port_name: state_1\n    artifact_type_input: none\n    artifact_type_output: none\n  - port_name: state_2\n    artifact_type_input: none\n    artifact_type_output: none\n  - port_name: state_3\n    artifact_type_input: none\n    artifact_type_output: none\n  - port_name: state_4\n    artifact_type_input: none\n    artifact_type_output: none\n\npolicy_ports:\n  - port_name: policy\n    artifact_type_input: none\n    artifact_type_output: none\n    response_data:\n      should_exit: boolean - Whether the loop should stop after this iteration.\n      exit_reason: string (optional) - Human-readable reason the loop stopped.\n\ninput_parameters:\n  - name: enable_looping\n    type: boolean\n    label: Enable Looping\n    default: false\n    description: Repeat the whole sequence until the policy says to stop.\n  - name: max_iterations\n    type: integer\n    label: Max Iterations\n    default: 10\n    description: Hard cap on loop iterations.\n  - name: exit_conditions\n    type: text_long\n    label: Exit Conditions\n    default: \"[]\"\n    description: JSON array of field/operator/value tests evaluated by the policy.\n  - name: states\n    type: text_long\n    label: States Configuration\n    default: \"[]\"\n    description: JSON array naming the slots to run, in order. Empty means probe state_1 upward.\n  - name: forward_input_to_states\n    type: boolean\n    label: Forward Input To States\n    default: false\n    description: Give every slot the executor's original input as well as prior slot output.\n  - name: flat_accumulation\n    type: boolean\n    label: Flat Accumulation\n    default: false\n    description: Merge slot outputs into one dict instead of namespacing them by slot.\n",
+      "name": "SEQUENTIAL EXECUTOR - FSM (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "optional(json)",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "input": {
+              "required": true,
+              "type": "object"
+            },
+            "state_1": {
+              "required": false,
+              "type": "object"
+            },
+            "state_2": {
+              "required": false,
+              "type": "object"
+            },
+            "state_3": {
+              "required": false,
+              "type": "object"
+            },
+            "state_4": {
+              "required": false,
+              "type": "object"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "policy",
+          "label": "Policy",
+          "multi_artifact": false,
+          "port_type": "policy",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "exit_reason": {
+              "required": false,
+              "type": "string"
+            },
+            "should_exit": {
+              "required": true,
+              "type": "boolean"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "state_1",
+          "label": "State 1",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "state_2",
+          "label": "State 2",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "state_3",
+          "label": "State 3",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "state_4",
+          "label": "State 4",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\nimport json as _json\n\n_NONE_ARTIFACT = perceivo.primitives.Artifact(type=perceivo.primitives.ArtifactType.NONE, data=None)\n\n\n\n\nasync def _run_flat(state_ports, original_data, enable_looping,\n                    max_iterations, exit_conditions, input_artifact):\n    \"\"\"Flat accumulation inter-state flow. Final output is always namespaced.\"\"\"\n    iteration = 0\n    accumulated = dict(original_data)\n    current_artifact = input_artifact\n    state_results = {}\n    artifact_map = {}\n\n    while iteration < max_iterations:\n        iteration += 1\n        if enable_looping:\n            perceivo.log.info(f\"Iteration {iteration}/{max_iterations}\")\n            accumulated = dict(original_data)\n            state_results = {}\n            artifact_map = {}\n\n        for port_name in state_ports:\n            try:\n                perceivo.log.info(\n                    f\"Flat: invoking {port_name} with keys={list(accumulated.keys())}\"\n                )\n                result = await perceivo.flow.invoke(\n                    port_name=port_name,\n                    request_data=accumulated,\n                    artifact=current_artifact,\n                )\n                if result and isinstance(result, dict):\n                    resp = result.get(\"response_data\", {})\n                    if isinstance(resp, dict):\n                        accumulated.update(resp)\n                        state_results[port_name] = resp\n                        perceivo.log.info(\n                            f\"Flat: {port_name} added keys={list(resp.keys())}\"\n                        )\n                    else:\n                        state_results[port_name] = {}\n\n                    # Artifact tracking\n                    if result.get(\"artifact\") is not None:\n                        current_artifact = result[\"artifact\"]\n                        artifact_map[port_name] = result[\"artifact\"]\n                        perceivo.log.info(f\"Flat: {port_name} produced artifact\")\n                    else:\n                        current_artifact = input_artifact\n                        artifact_map[port_name] = _NONE_ARTIFACT\n                else:\n                    state_results[port_name] = {}\n                    artifact_map[port_name] = _NONE_ARTIFACT\n            except ValueError as e:\n                if \"No connection found\" in str(e):\n                    perceivo.log.info(f\"No connection for {port_name}, finished state enumeration\")\n                    break\n                raise\n            except Exception as e:\n                # Fail-closed: a state slot that RAISES must fail the\n                # run, not be swallowed into a false-success COMPLETED result.\n                # Re-raise so the exception propagates and the run is marked\n                # FAILED. Slots that return success-shaped failures without\n                # raising are unaffected and still flow through normally.\n                perceivo.log.error(f\"State '{port_name}' raised; failing closed: {str(e)}\")\n                raise\n\n        if not enable_looping:\n            break\n\n        # Evaluate exit conditions via policy\n        policy_result = await perceivo.flow.invoke(\n            port_name=\"policy\",\n            request_data={\n                \"data\": accumulated,\n                \"exit_conditions\": exit_conditions,\n                \"iteration\": iteration,\n                \"max_iterations\": max_iterations,\n            },\n        )\n\n        should_exit = False\n        if policy_result and isinstance(policy_result, dict):\n            resp = policy_result.get(\"response_data\", {})\n            should_exit = resp.get(\"should_exit\", False)\n            exit_reason = resp.get(\"exit_reason\", None)\n\n        if should_exit:\n            perceivo.log.info(f\"Loop exiting at iteration {iteration}: {exit_reason}\")\n            break\n    else:\n        perceivo.log.info(f\"Loop completed: max_iterations ({max_iterations}) reached\")\n\n    # Determine final artifact: last non-None state artifact, or input\n    final_artifact = input_artifact\n    for port_name in reversed(list(artifact_map.keys())):\n        if artifact_map[port_name].type != perceivo.primitives.ArtifactType.NONE:\n            final_artifact = artifact_map[port_name]\n            break\n\n    return state_results, artifact_map, final_artifact\n\n\n\nasync def _run_namespaced(state_ports, original_data, forward_input,\n                          enable_looping, max_iterations, exit_conditions,\n                          input_artifact):\n    \"\"\"Namespaced accumulation inter-state flow. Final output is always namespaced.\"\"\"\n    iteration = 0\n    state_results = {}\n    current_artifact = input_artifact\n    artifact_map = {}\n\n    while iteration < max_iterations:\n        iteration += 1\n        if enable_looping:\n            perceivo.log.info(f\"Iteration {iteration}/{max_iterations}\")\n            state_results = {}\n            artifact_map = {}\n\n        for port_name in state_ports:\n            try:\n                if not state_results:\n                    # First state: always gets executor input\n                    request = dict(original_data)\n                elif forward_input:\n                    # Forward mode: executor input + accumulated namespaced outputs\n                    request = {**original_data, **state_results}\n                    perceivo.log.info(\n                        f\"Namespaced+forward: {port_name} gets original_keys=\"\n                        f\"{list(original_data.keys())} + state_keys=\"\n                        f\"{list(state_results.keys())}\"\n                    )\n                else:\n                    # Normal mode: only accumulated namespaced state outputs\n                    request = dict(state_results)\n\n                result = await perceivo.flow.invoke(\n                    port_name=port_name,\n                    request_data=request,\n                    artifact=current_artifact,\n                )\n                if result and isinstance(result, dict):\n                    resp = result.get(\"response_data\", {})\n                    if isinstance(resp, dict):\n                        state_results[port_name] = resp\n                    else:\n                        state_results[port_name] = {}\n\n                    # Artifact tracking\n                    if result.get(\"artifact\") is not None:\n                        current_artifact = result[\"artifact\"]\n                        artifact_map[port_name] = result[\"artifact\"]\n                        perceivo.log.info(f\"Namespaced: {port_name} produced artifact\")\n                    else:\n                        current_artifact = input_artifact\n                        artifact_map[port_name] = _NONE_ARTIFACT\n                else:\n                    state_results[port_name] = {}\n                    artifact_map[port_name] = _NONE_ARTIFACT\n            except ValueError as e:\n                if \"No connection found\" in str(e):\n                    perceivo.log.info(f\"No connection for {port_name}, finished state enumeration\")\n                    break\n                raise\n            except Exception as e:\n                # Fail-closed: a state slot that RAISES must fail the\n                # run, not be swallowed into a false-success COMPLETED result.\n                # Re-raise so the exception propagates and the run is marked\n                # FAILED. Slots that return success-shaped failures without\n                # raising are unaffected and still flow through normally.\n                perceivo.log.error(f\"State '{port_name}' raised; failing closed: {str(e)}\")\n                raise\n\n        if not enable_looping:\n            break\n\n        # Evaluate exit conditions via policy\n        policy_result = await perceivo.flow.invoke(\n            port_name=\"policy\",\n            request_data={\n                \"data\": state_results,\n                \"exit_conditions\": exit_conditions,\n                \"iteration\": iteration,\n                \"max_iterations\": max_iterations,\n            },\n        )\n\n        should_exit = False\n        if policy_result and isinstance(policy_result, dict):\n            resp = policy_result.get(\"response_data\", {})\n            should_exit = resp.get(\"should_exit\", False)\n            exit_reason = resp.get(\"exit_reason\", None)\n\n        if should_exit:\n            perceivo.log.info(f\"Loop exiting at iteration {iteration}: {exit_reason}\")\n            break\n    else:\n        perceivo.log.info(f\"Loop completed: max_iterations ({max_iterations}) reached\")\n\n    # Determine final artifact: last non-None state artifact, or input\n    final_artifact = input_artifact\n    for port_name in reversed(list(artifact_map.keys())):\n        if artifact_map[port_name].type != perceivo.primitives.ArtifactType.NONE:\n            final_artifact = artifact_map[port_name]\n            break\n\n    return state_results, artifact_map, final_artifact\n\n\n\n\n@perceivo.fsm\nasync def sequential_executor(input: perceivo.primitives.FsmInput) -> perceivo.primitives.FsmOutput:\n    flat_mode = perceivo.params.get(\"flat_accumulation\", \"false\")\n    flat_mode = str(flat_mode).lower() in (\"true\", \"1\", \"yes\")\n\n    enable_looping = perceivo.params.get(\"enable_looping\", \"false\")\n    enable_looping = str(enable_looping).lower() in (\"true\", \"1\", \"yes\")\n\n    forward_input = perceivo.params.get(\"forward_input_to_states\", \"false\")\n    forward_input = str(forward_input).lower() in (\"true\", \"1\", \"yes\")\n\n    exit_conditions_raw = perceivo.params.get(\"exit_conditions\", \"[]\")\n    max_iterations = int(perceivo.params.get(\"max_iterations\", 10))\n    states_raw = perceivo.params.get(\"states\", \"[]\")\n\n    try:\n        exit_conditions = _json.loads(exit_conditions_raw) if isinstance(exit_conditions_raw, str) else exit_conditions_raw\n    except (ValueError, TypeError):\n        exit_conditions = []\n\n    try:\n        states = _json.loads(states_raw) if isinstance(states_raw, str) else states_raw\n    except (ValueError, TypeError):\n        states = []\n\n    # Determine state ports to execute\n    if states:\n        state_ports = [s.get(\"port_name\", f\"state_{i+1}\") for i, s in enumerate(states)]\n    else:\n        state_ports = [f\"state_{i}\" for i in range(1, 11)]\n\n    # Initial executor input\n    original_data = dict(input.request_data or {})\n    input_artifact = None\n    if input.artifact:\n        input_artifact = input.artifact\n\n    perceivo.log.info(\n        f\"Sequential Executor: mode={'flat' if flat_mode else 'namespaced'}, \"\n        f\"forward_input={forward_input}, looping={enable_looping}, \"\n        f\"input keys={list(original_data.keys())}\"\n    )\n\n    if not enable_looping:\n        max_iterations = 1\n\n    # Execute states ??? both modes return the same tuple\n    if flat_mode:\n        state_results, artifact_map, final_artifact = await _run_flat(\n            state_ports, original_data, enable_looping, max_iterations,\n            exit_conditions, input_artifact,\n        )\n    else:\n        state_results, artifact_map, final_artifact = await _run_namespaced(\n            state_ports, original_data, forward_input, enable_looping,\n            max_iterations, exit_conditions, input_artifact,\n        )\n\n    # ALWAYS namespaced final output\n    response_data = {\"input\": original_data}\n    response_data.update(state_results)\n\n    perceivo.log.info(\n        f\"Sequential Executor complete: output keys={list(response_data.keys())}, \"\n        f\"artifacts={list(artifact_map.keys())}, \"\n        f\"has_final_artifact={final_artifact is not None and final_artifact.type != perceivo.primitives.ArtifactType.NONE}\"\n    )\n\n    return perceivo.primitives.FsmOutput(\n        artifact=final_artifact,\n        artifacts=artifact_map,\n        response_data=response_data,\n    )\n    # Deliberately unreachable, and load-bearing for component validation:\n    # the extractor reads EVERY return in the function, and this is the only\n    # one that omits `artifact=`. That is what makes `artifact` provably\n    # optional (justifying `optional(json)` on the input port) and gives\n    # `response_data` a resolvable literal. Removing it fails the component\n    # with VAL-CONTRACT-OPTIONAL-001 + VAL-UNVERIFIABLE-RESP-001.\n    return perceivo.primitives.FsmOutput(response_data={})  # NOSONAR\n",
+      "short_description": "The engine of the Sequential Executor template. It holds the ordered steps and drives them",
+      "tags": [],
+      "template_source_id": null
+    }
+  },
+  "edges": [
+    {
+      "edge_kind": "MAINFLOW",
+      "source_port_index": 0,
+      "target_port_index": 1
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 2,
+      "target_port_index": 3
+    }
+  ],
+  "export_type": "orchestration",
+  "export_version": "1.0",
+  "exported_at": "2026-07-18T02:12:21.180325Z",
+  "nodes": [
+    {
+      "component_asset_id": "05d94f0f-2b33-4747-baff-52f88b0f33b5",
+      "component_ref": "comp_0",
+      "config": {
+        "port_sides": {
+          "": "top"
+        }
+      },
+      "local_id": "node_0",
+      "name": "Sequential Executor Policy",
+      "position": {
+        "x": 326.0,
+        "y": 430.0
+      }
+    },
+    {
+      "component_asset_id": "4ed64f7d-3526-40a8-ae2d-860f4f6432af",
+      "component_ref": "comp_1",
+      "config": {},
+      "local_id": "node_1",
+      "name": "Sequential Executor - End",
+      "position": {
+        "x": 710.0,
+        "y": 36.0
+      }
+    },
+    {
+      "component_asset_id": "a3b34f65-c876-4a3e-b88b-f097b944728e",
+      "component_ref": "comp_3",
+      "config": {
+        "_mainflow_target_node_ref": "end",
+        "mainflow_target_node_ref": "node_1",
+        "port_sides": {
+          "": "left"
+        }
+      },
+      "local_id": "node_2",
+      "name": "Sequential Executor",
+      "position": {
+        "x": 326.0,
+        "y": 220.0
+      }
+    },
+    {
+      "component_asset_id": "69b2c99f-9555-4c0f-b359-1a3ea7163091",
+      "component_ref": "comp_2",
+      "config": {},
+      "local_id": "node_3",
+      "name": "Sequential Executor - Start",
+      "position": {
+        "x": 50.0,
+        "y": 236.0
+      }
+    }
+  ],
+  "orchestration": {
+    "additional_packages": [],
+    "description": "What it does Runs a series of steps one after another, in the order you wire them, passing each result to the next. It is the building block for a linear pipeline.\n\nHow it works Drop it into a flow as a single node and wire a component into each state slot. It runs slot one, hands the result to slot two, and so on. It can optionally loop the whole sequence until a condition you define is met or an iteration ceiling is reached, which turns a straight pipeline into a retry or refinement loop. The decision to continue, loop or stop is made by its policy component on every pass.\n\nConfigure (on the FSM component inside)\n- States - the ordered slots, and what runs in each.\n- Enable looping - repeat the sequence rather than running it once.\n- Max iterations - the ceiling that stops a loop running away.\n- Exit conditions - the tests that end the loop early when met.\n- Forward input to states - give every step the original input as well as the previous\nstep's result.\n- Flat accumulation - collect results into one flat object instead of nesting them per step.\n\nIn and out In: whatever the caller sent. Out: the result of the final step, or the accumulated results.\n\nUse it when\n- Work has to happen in a fixed order because each step needs the one before it.\n- You want to retry or refine a result until it is good enough.\n- A long process reads better as named steps than as one large component.",
+    "disable_intermediate_snapshots": false,
+    "name": "SEQUENTIAL EXECUTOR (SYSTEM, READ-ONLY)",
+    "requires_gpu": false,
+    "runtime_config": null,
+    "tags": []
+  },
+  "ports": [
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "output",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "policy",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_0"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "external_input",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "external_output",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    }
+  ],
+  "secrets_required": []
+}

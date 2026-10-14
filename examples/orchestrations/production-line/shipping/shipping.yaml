@@ -1,0 +1,36 @@
+extension_type: END
+name: Shipping
+description: Ships the product if it passed inspection, and returns the traveler.
+tags:
+  - beginner
+  - end
+input_ports:
+  - port_name: input
+    port_type: in
+    artifact_type_input: text
+    request_data:
+      product:
+        type: string
+        description: What the line made.
+      stages_completed:
+        type: integer
+        description: How many stages finished.
+      passed:
+        type: boolean
+        description: Whether the product passed inspection.
+external_out_port:
+  port_name: external_out
+  port_type: external_out
+  artifact_type_input: text
+  response_data:
+    product:
+      type: string
+      description: What the line made.
+    stages_completed:
+      type: integer
+      description: How many stages finished.
+    status:
+      type: string
+      description: shipped, or held for rework.
+input_parameters: []
+required_secrets: []

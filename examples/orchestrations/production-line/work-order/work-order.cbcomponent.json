@@ -1,0 +1,94 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:56:02.492020Z",
+  "component": {
+    "asset_id": null,
+    "name": "Work Order",
+    "category": "START",
+    "description": "Takes the product to build and how long each stage should take.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "start"
+    ],
+    "config": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\nfrom perceivo.primitives import StartInput, StartOutput\n\n\n@perceivo.start\nasync def work_order(input: StartInput) -> StartOutput:\n    \"\"\"Check the work order and send it to the line supervisor.\"\"\"\n    product = input.request_data.get(\"product\", \"\").strip()\n    seconds = int(input.request_data.get(\"seconds_per_stage\", 5))\n\n    if not product:\n        raise ValueError(\"'product' is required.\")\n    if not 1 <= seconds <= 30:\n        raise ValueError(\"'seconds_per_stage' must be between 1 and 30.\")\n\n    return StartOutput(response_data={\"product\": product, \"seconds_per_stage\": seconds})\n",
+    "manifest_yaml": "extension_type: START\nname: Work Order\ndescription: Takes the product to build and how long each stage should take.\ntags:\n  - beginner\n  - start\nexternal_in_port:\n  port_name: external_in\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: none\n  request_data:\n    product:\n      type: string\n      description: What the line should make, for example \"bicycle frame\".\n    seconds_per_stage:\n      type: integer\n      description: How long each of the four stages works, 1 to 30 seconds.\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_input: json\n    artifact_type_output: none\n    response_data:\n      product:\n        type: string\n        description: What the line should make.\n      seconds_per_stage:\n        type: integer\n        description: How long each stage works.\ninput_parameters: []\ninput_prompt: Name a product and how many seconds each stage should take.\nrequired_secrets: []\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "external_in",
+        "label": null,
+        "port_type": "external_in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "product": {
+            "type": "string",
+            "description": "What the line should make, for example \"bicycle frame\"."
+          },
+          "seconds_per_stage": {
+            "type": "integer",
+            "description": "How long each of the four stages works, 1 to 30 seconds."
+          }
+        },
+        "response_data_schema": null,
+        "artifact_type_input": "json",
+        "artifact_type_output": "none",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "OUT",
+        "key": "output",
+        "label": null,
+        "port_type": "out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "product": {
+            "type": "string",
+            "description": "What the line should make."
+          },
+          "seconds_per_stage": {
+            "type": "integer",
+            "description": "How long each stage works."
+          }
+        },
+        "artifact_type_input": "json",
+        "artifact_type_output": "none",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

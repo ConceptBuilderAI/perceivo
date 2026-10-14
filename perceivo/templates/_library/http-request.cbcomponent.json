@@ -1,0 +1,240 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "HTTP REQUEST (SYSTEM, READ-ONLY)",
+    "category": "TOOL",
+    "description": "What it does Calls any HTTP API, webhook or service and hands the reply to the next step: the status code, whether it succeeded, the headers and the body, plus the body parsed from JSON when the server sent JSON.\n\nHow it works The request is built from the Inspector settings and the data arriving at the node, which may give the URL or a path under the Base URL, override the method, and add headers, query parameters and a body. It goes out through the organization's approved outbound routes, so the target host must have a route in Infrastructure > Networking. Redirects are not followed. An error status such as 404 or 500 is returned as a result with success false, so the orchestration can branch on it; a request that gets no response at all - a refused route, a timeout, a bad setting - fails the run.\n\nConfigure\n- Method - GET (default), POST, PUT, PATCH, DELETE or HEAD.\n- Base URL - for example https://api.example.com/v1.\n- Default Headers - a JSON object sent with every request.\n- Authentication - none, bearer_token, api_key_header (with the API Key Header name) or basic_auth.\n- Auth Token - bind the organization secret holding the token, key, or username:password.\n- Timeout - seconds to wait, 30 by default.\n- Response Type - auto (JSON when the server says so), json or text.\n- Wait for Response - turn off to return only the status (webhook mode).\n\nIn and out In: optional url, method, headers, query_params, and a body (JSON) or body_text (raw text). Out: status_code, success, body (the text), data (the parsed JSON, an array as items), headers, content_type, elapsed_ms, and error when the status is 400 or above.\n\nUse it when\n- An orchestration needs data from, or must notify, an external API.\n- An agent needs a tool it can call to reach a REST service.\n- You want to fire a webhook at the end of a run.",
+    "short_description": "Calls an HTTP API or webhook and returns the status, headers and parsed body.",
+    "tags": [
+      "template",
+      "tool",
+      "http",
+      "integration"
+    ],
+    "config": {
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "required_secrets": [
+        {
+          "name": "auth_token",
+          "label": "Auth Token",
+          "required": false,
+          "description": "Bearer token, API key, or username:password for basic authentication."
+        }
+      ],
+      "icon": {
+        "type": "lucide",
+        "value": "globe"
+      },
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "method",
+            "type": "select",
+            "label": "Method",
+            "options": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "HEAD"
+            ],
+            "default": "GET",
+            "required": true
+          },
+          {
+            "name": "base_url",
+            "type": "text",
+            "label": "Base URL",
+            "description": "For example https://api.example.com/v1. request_data.url may be a path under it."
+          },
+          {
+            "name": "default_headers",
+            "type": "text_long",
+            "label": "Default Headers (JSON)",
+            "default": "{}",
+            "description": "A JSON object of headers sent with every request."
+          },
+          {
+            "name": "auth_type",
+            "type": "select",
+            "label": "Authentication",
+            "options": [
+              "none",
+              "bearer_token",
+              "api_key_header",
+              "basic_auth"
+            ],
+            "default": "none"
+          },
+          {
+            "name": "auth_header_name",
+            "type": "text",
+            "label": "API Key Header",
+            "default": "X-API-Key",
+            "description": "The header that carries the key when Authentication is api_key_header."
+          },
+          {
+            "name": "timeout_seconds",
+            "type": "number",
+            "label": "Timeout (seconds)",
+            "default": 30
+          },
+          {
+            "name": "response_type",
+            "type": "select",
+            "label": "Response Type",
+            "options": [
+              "auto",
+              "json",
+              "text"
+            ],
+            "default": "auto"
+          },
+          {
+            "name": "wait_for_response",
+            "type": "boolean",
+            "label": "Wait for Response",
+            "default": true,
+            "required": false,
+            "description": "When off, only the status is returned and the body is not read (webhook mode)."
+          }
+        ],
+        "values": {
+          "method": "GET",
+          "base_url": "",
+          "default_headers": "{}",
+          "auth_type": "none",
+          "auth_header_name": "X-API-Key",
+          "timeout_seconds": 30,
+          "response_type": "auto",
+          "wait_for_response": true
+        }
+      },
+      "detected_endpoints": [
+        {
+          "category": "http_client",
+          "library": "httpx",
+          "host": null,
+          "confidence": "detected",
+          "description": "HTTP client (httpx)"
+        }
+      ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "script": "import base64\nimport ipaddress\nimport json\nimport time\nfrom urllib.parse import urlsplit\n\nimport httpx\nimport perceivo\n\n_METHODS = (\"GET\", \"POST\", \"PUT\", \"PATCH\", \"DELETE\", \"HEAD\")\n_AUTH_TYPES = (\"none\", \"bearer_token\", \"api_key_header\", \"basic_auth\")\n_RESPONSE_TYPES = (\"auto\", \"json\", \"text\")\n_FALSY = (\"false\", \"0\", \"no\", \"off\")\n_HEADER_NAME_PUNCTUATION = \"!#$%&'*+-.^_`|~\"\n_HOST_CHARS = frozenset(\"abcdefghijklmnopqrstuvwxyz0123456789.-_\")\n_BAD_URL = (\n    \"The URL is not valid. Check Base URL and request_data.url. If it holds a username \"\n    \"and password, remove them and use Authentication instead. The URL is not shown \"\n    \"because it can carry a credential.\"\n)\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    return str(perceivo.params.get(name, default) or default).strip()\n\n\ndef _flag(name: str, default: bool) -> bool:\n    value = perceivo.params.get(name, default)\n    if isinstance(value, bool):\n        return value\n    return str(value).strip().lower() not in _FALSY\n\n\ndef _scheme_note(base_url: str) -> str:\n    \"\"\"', not ftp://' when base_url opens with a well-formed scheme, else ''.\"\"\"\n    head, sep, _ = base_url.partition(\"://\")\n    token = head.replace(\"+\", \"\").replace(\"-\", \"\").replace(\".\", \"\")\n    if sep and head[:1].isalpha() and len(head) <= 16 and token.isascii() and token.isalnum():\n        return f\", not {head.lower()}://\"\n    return \"\"\n\n\ndef _resolve_url(base_url: str, url: str) -> str:\n    \"\"\"An absolute url is used as given; anything else is a path under base_url.\"\"\"\n    url = (url or \"\").strip()\n    if url.lower().startswith((\"http://\", \"https://\")):\n        return url\n    if not base_url:\n        raise ValueError(\n            \"No URL. Set Base URL in the Inspector, or send an absolute url in request_data.\"\n        )\n    if not base_url.lower().startswith((\"http://\", \"https://\")):\n        # Base URL can carry user:password@ or a key in its query string, and an\n        # error message is stored and shown; only its scheme is named.\n        raise ValueError(\n            f\"Base URL must start with http:// or https://{_scheme_note(base_url)}.\"\n        )\n    if not url:\n        return base_url\n    return base_url.rstrip(\"/\") + \"/\" + url.lstrip(\"/\")\n\n\ndef _split(url: str):\n    \"\"\"urlsplit(url) and its port, with the parser's own error replaced.\n\n    The parser quotes the part it cannot read, and for a URL whose password\n    holds an unencoded #, / or ? that part is the password.\n    \"\"\"\n    try:\n        parts = urlsplit(url)\n        return parts, parts.port\n    except ValueError:\n        raise ValueError(_BAD_URL) from None\n\n\ndef _plain_host(host: str) -> bool:\n    \"\"\"A DNS name or IPv4 literal, or an IPv6 literal without a zone.\"\"\"\n    if set(host) <= _HOST_CHARS:\n        return True\n    # Checked before ip_address(), which accepts a zone: fe80::1%admin:hunter2.\n    if not set(host) <= _HOST_CHARS | {\":\"}:\n        return False\n    try:\n        ipaddress.ip_address(host)\n    except ValueError:\n        return False\n    return True\n\n\ndef _under_base(base_url: str, target) -> bool:\n    \"\"\"True when target is on Base URL's scheme, host and port, at or below its path.\"\"\"\n    if not base_url:\n        return False\n    base, _ = _split(base_url)\n    if (base.scheme.lower(), base.netloc.lower()) != (target.scheme.lower(), target.netloc.lower()):\n        return False\n    prefix = base.path.rstrip(\"/\")\n    return not prefix or target.path == prefix or target.path.startswith(prefix + \"/\")\n\n\ndef _default_headers() -> dict:\n    raw = _param(\"default_headers\", \"{}\") or \"{}\"\n    try:\n        headers = json.loads(raw)\n    except json.JSONDecodeError as exc:\n        raise ValueError(f\"Default Headers is not valid JSON: {exc.msg}.\") from None\n    if not isinstance(headers, dict):\n        raise ValueError(\n            'Default Headers must be a JSON object, e.g. {\"Accept\": \"application/json\"}.'\n        )\n    return _clean_headers(headers, \"Default Headers\")\n\n\ndef _clean_headers(headers: dict, source: str) -> dict:\n    \"\"\"headers with each name and value trimmed; refused when one is not valid HTTP.\n\n    The HTTP client quotes a header it refuses, and a header can be the\n    credential. The check is made here so that nothing of it reaches an error.\n    \"\"\"\n    clean = {}\n    for key, value in headers.items():\n        name, text = str(key).strip(), str(value).strip()\n        name_ok = (\n            bool(name)\n            and name.isascii()\n            and all(char.isalnum() or char in _HEADER_NAME_PUNCTUATION for char in name)\n        )\n        text_ok = all(char == \"\\t\" or \" \" <= char <= \"~\" for char in text)\n        if not (name_ok and text_ok):\n            raise ValueError(\n                f\"{source}: a header name or value is not valid HTTP, for example it holds \"\n                \"a line break or a character outside ASCII. It is not shown because a \"\n                \"header can carry a credential.\"\n            )\n        clean[name] = text\n    return clean\n\n\nasync def _auth_header(auth_type: str) -> dict:\n    \"\"\"The credential header for auth_type. The token is the auth_token secret.\"\"\"\n    if auth_type == \"none\":\n        return {}\n    # A secret pasted with a trailing line break is still the same secret. A\n    # basic credential loses only line breaks: a space at either end belongs to\n    # the username or the password, and removing it would change what is sent.\n    stored = str(await perceivo.secrets.get(\"auth_token\") or \"\")\n    token = stored.strip(\"\\r\\n\") if auth_type == \"basic_auth\" else stored.strip()\n    if not token.strip():\n        raise ValueError(\n            f\"Authentication is {auth_type} but no auth_token secret is bound. Bind one \"\n            \"in the Inspector, or set Authentication to none.\"\n        )\n    if auth_type == \"bearer_token\":\n        return {\"Authorization\": f\"Bearer {token}\"}\n    if auth_type == \"api_key_header\":\n        return {_param(\"auth_header_name\", \"X-API-Key\") or \"X-API-Key\": token}\n    if \":\" not in token:\n        raise ValueError(\"Basic authentication needs the auth_token secret as username:password.\")\n    return {\"Authorization\": \"Basic \" + base64.b64encode(token.encode()).decode()}\n\n\ndef _parse_data(response: httpx.Response, response_type: str, success: bool) -> dict:\n    \"\"\"The body parsed as JSON, always as an object, per Response Type.\n\n    auto parses when the server says it sent JSON; json always parses; text\n    never does. A JSON array arrives as {\"items\": [...]} and a JSON scalar as\n    {\"value\": ...}, so `data` is an object whatever the server sent; {} means\n    the body was not JSON. json insists on JSON for a successful response; an\n    error response that is not JSON gives {} instead, so the status code is\n    never hidden behind a parse error.\n    \"\"\"\n    content_type = response.headers.get(\"content-type\", \"\")\n    wants_json = response_type == \"json\" or (\n        response_type == \"auto\" and \"json\" in content_type.lower()\n    )\n    if not wants_json or not response.content:\n        return {}\n    try:\n        parsed = response.json()\n    except ValueError:\n        if response_type == \"json\" and success:\n            raise ValueError(\n                f\"Response Type is json but the {response.status_code} response is not \"\n                f\"valid JSON (Content-Type {content_type or 'unset'}).\"\n            ) from None\n        return {}\n    if isinstance(parsed, dict):\n        return parsed\n    if isinstance(parsed, list):\n        return {\"items\": parsed}\n    return {\"value\": parsed}\n\n\n@perceivo.tool\nasync def http_request(input: perceivo.primitives.ToolInput) -> perceivo.primitives.ToolOutput:\n    \"\"\"Make one outbound HTTP request and return the response as data.\n\n    The method, base URL, headers, authentication and timeout are node\n    parameters; request_data may supply the url (absolute, or a path under the\n    base URL), override the method, and add headers, query parameters and a\n    body. The credential is the optional `auth_token` secret, read by NAME.\n\n    An HTTP error status is a RESULT, not a failure: it is returned with\n    success false so the next node can branch on it. Anything that means no\n    response was obtained -- bad configuration, a refused route, a timeout --\n    raises and fails the run.\n    \"\"\"\n    data = input.request_data or {}\n    if not isinstance(data, dict):\n        data = {}\n\n    method = str(data.get(\"method\") or _param(\"method\", \"GET\")).strip().upper()\n    if method not in _METHODS:\n        raise ValueError(f\"Method is {method!r}. Choose one of: {', '.join(_METHODS)}.\")\n\n    url = _resolve_url(_param(\"base_url\"), str(data.get(\"url\") or \"\"))\n    parts, port = _split(url)\n\n    auth_type = _param(\"auth_type\", \"none\").lower()\n    if auth_type not in _AUTH_TYPES:\n        raise ValueError(\n            f\"Authentication is {auth_type!r}. Choose one of: {', '.join(_AUTH_TYPES)}.\"\n        )\n    # request_data can come from upstream nodes, LLM output included, so an\n    # absolute url there must not carry the bound credential to another host.\n    if auth_type != \"none\" and not _under_base(_param(\"base_url\"), parts):\n        raise ValueError(\n            \"Authentication sends the auth_token secret, so the url must be under Base URL. \"\n            \"Set Base URL to the host you authenticate to, or send a path rather than an \"\n            \"absolute url.\"\n        )\n\n    response_type = _param(\"response_type\", \"auto\").lower()\n    if response_type not in _RESPONSE_TYPES:\n        raise ValueError(\n            f\"Response Type is {response_type!r}. Choose one of: {', '.join(_RESPONSE_TYPES)}.\"\n        )\n\n    # Read raw: _param would turn an explicit 0 into the default.\n    raw_timeout = perceivo.params.get(\"timeout_seconds\", 30)\n    try:\n        timeout = float(\n            30 if raw_timeout is None or str(raw_timeout).strip() == \"\" else raw_timeout\n        )\n    except ValueError:\n        raise ValueError(\"Timeout must be a number of seconds.\") from None\n    if timeout <= 0:\n        raise ValueError(\"Timeout must be greater than zero.\")\n\n    headers = _default_headers()\n    headers.update(_clean_headers(await _auth_header(auth_type), \"Authentication\"))\n    extra = data.get(\"headers\")\n    if isinstance(extra, dict):\n        headers.update(_clean_headers(extra, \"request_data headers\"))\n\n    query = data.get(\"query_params\")\n    params = query if isinstance(query, dict) and query else None\n\n    body, body_text = data.get(\"body\"), data.get(\"body_text\")\n    if body is not None and body_text is not None:\n        raise ValueError(\"Send body (JSON) or body_text, not both.\")\n    send = {}\n    if body is not None:\n        send[\"json\"] = body\n    elif body_text is not None:\n        send[\"content\"] = str(body_text)\n    # Encoded as the HTTP client will (httpx 0.28: UTF-8, ensure_ascii=False),\n    # so that its UnicodeError, caught below as a bad URL or header, cannot come\n    # from the body.\n    try:\n        if \"json\" in send:\n            json.dumps(send[\"json\"], ensure_ascii=False, allow_nan=False).encode(\"utf-8\")\n        elif \"content\" in send:\n            send[\"content\"].encode(\"utf-8\")\n    except UnicodeError:\n        raise ValueError(\n            \"The body cannot be sent: it holds text that is not valid Unicode, such as \"\n            \"half of a surrogate pair.\"\n        ) from None\n\n    # The path (a webhook keeps its key there), the query string, the\n    # user:password@ part and the headers can carry credentials; none of them\n    # is logged. A URL with an @ anywhere is logged without its host, because a\n    # badly written user:password@ can parse as the host. That includes an @ in\n    # the path or query, such as an e-mail address: https://user:8443/x@host\n    # puts a password where the port goes, and nothing in the text tells the two\n    # apart. A host that is not a plain name -- user%3Apass%40host is a\n    # percent-encoded credential, and [user:pass] parses as a bracketed host --\n    # is not logged either.\n    host = parts.hostname or \"\"\n    if \"@\" in url:\n        logged_url = f\"{parts.scheme}://(host not logged: the URL contains @)\"\n    elif not _plain_host(host):\n        logged_url = f\"{parts.scheme}://(host not logged: not a plain host name)\"\n    else:\n        logged_url = f\"{parts.scheme}://{host}\"\n        if port:\n            logged_url += f\":{port}\"\n    perceivo.log.info(\n        f\"HTTP Request: {method} {logged_url}\",\n        method=method,\n        has_body=bool(send),\n        header_count=len(headers),\n    )\n\n    wait = _flag(\"wait_for_response\", True)\n    started = time.monotonic()\n    # Redirects are not followed: the guarded client validates each destination\n    # against the organization's outbound routes and refuses follow_redirects.\n    # Streaming lets webhook mode return on the status line without downloading\n    # the body; otherwise the whole body is read before the client closes.\n    try:\n        async with (\n            httpx.AsyncClient(timeout=timeout) as client,\n            client.stream(method, url, headers=headers, params=params, **send) as response,\n        ):\n            if wait:\n                await response.aread()\n    except (httpx.InvalidURL, httpx.LocalProtocolError, UnicodeError):\n        # These quote the URL or header bytes they refuse. The body was encoded\n        # above, so a UnicodeError here is the URL's: its host or query string.\n        raise ValueError(\n            \"The request could not be built: the URL or a header is not valid HTTP. \"\n            \"Neither is shown because either can carry a credential.\"\n        ) from None\n    elapsed_ms = round((time.monotonic() - started) * 1000)\n\n    status_code = response.status_code\n    success = status_code < 400\n    content_type = response.headers.get(\"content-type\", \"\")\n    text = response.text if wait else \"\"\n    parsed = _parse_data(response, response_type, success) if wait else {}\n\n    perceivo.log.info(\n        f\"HTTP Request: {status_code} in {elapsed_ms} ms\",\n        status_code=status_code,\n        success=success,\n        elapsed_ms=elapsed_ms,\n    )\n\n    return perceivo.primitives.ToolOutput(\n        response_data={\n            \"status_code\": status_code,\n            \"success\": success,\n            \"body\": text,\n            \"data\": parsed,\n            \"headers\": dict(response.headers.items()),\n            \"content_type\": content_type,\n            \"elapsed_ms\": elapsed_ms,\n            \"error\": \"\" if success else f\"HTTP {status_code} {response.reason_phrase}\".strip(),\n        },\n    )\n",
+    "manifest_yaml": "extension_type: tool\nname: HTTP Request\ndescription: >\n  Makes one outbound HTTP request through the organization's approved routes\n  and returns the status, headers and parsed body as data. An HTTP error\n  status is returned with success false; a request that gets no response\n  (bad configuration, refused route, timeout) fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # A TOOL reached by an INVOKE edge, or a step in a flow. The response is\n    # data, not an artifact, so both halves are none.\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      url: string (optional) - Absolute URL, or a path appended to Base URL.\n      method: string (optional) - Overrides the Method parameter.\n      headers: object (optional) - Headers added to (and overriding) the defaults.\n      query_params: object (optional) - Query string parameters.\n      body: object (optional) - JSON request body.\n      body_text: string (optional) - Raw text request body, instead of body.\n    response_data:\n      status_code: integer - The HTTP status code.\n      success: boolean - True when the status code is below 400.\n      body: string - The response body as text; empty when Wait for Response is off.\n      data: object - The body parsed as JSON (an array as items, a scalar as value); empty when not JSON.\n      headers: object - The response headers.\n      content_type: string - The response Content-Type; empty when the server sent none.\n      elapsed_ms: integer - How long the request took, in milliseconds.\n      error: string - \"HTTP <code> <reason>\" when success is false; empty otherwise.\n\nrequired_secrets:\n  - name: auth_token\n    label: Auth Token\n    required: false\n    description: Bearer token, API key, or username:password for basic authentication.\n\ninput_parameters:\n  - name: method\n    type: select\n    label: Method\n    options: [GET, POST, PUT, PATCH, DELETE, HEAD]\n    default: GET\n    required: true\n  - name: base_url\n    type: text\n    label: Base URL\n    description: For example https://api.example.com/v1. request_data.url may be a path under it.\n  - name: default_headers\n    type: text_long\n    label: Default Headers (JSON)\n    default: \"{}\"\n    description: A JSON object of headers sent with every request.\n  - name: auth_type\n    type: select\n    label: Authentication\n    options: [none, bearer_token, api_key_header, basic_auth]\n    default: none\n  - name: auth_header_name\n    type: text\n    label: API Key Header\n    default: X-API-Key\n    description: The header that carries the key when Authentication is api_key_header.\n  - name: timeout_seconds\n    type: number\n    label: Timeout (seconds)\n    default: 30\n  - name: response_type\n    type: select\n    label: Response Type\n    options: [auto, json, text]\n    default: auto\n  - name: wait_for_response\n    type: boolean\n    label: Wait for Response\n    default: true\n    required: false\n    description: When off, only the status is returned and the body is not read (webhook mode).\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "url": {
+            "type": "string",
+            "required": false,
+            "description": "Absolute URL, or a path appended to Base URL."
+          },
+          "method": {
+            "type": "string",
+            "required": false,
+            "description": "Overrides the Method parameter."
+          },
+          "headers": {
+            "type": "object",
+            "required": false,
+            "description": "Headers added to (and overriding) the defaults."
+          },
+          "query_params": {
+            "type": "object",
+            "required": false,
+            "description": "Query string parameters."
+          },
+          "body": {
+            "type": "object",
+            "required": false,
+            "description": "JSON request body."
+          },
+          "body_text": {
+            "type": "string",
+            "required": false,
+            "description": "Raw text request body, instead of body."
+          }
+        },
+        "response_data_schema": {
+          "status_code": {
+            "type": "integer",
+            "required": true,
+            "description": "The HTTP status code."
+          },
+          "success": {
+            "type": "boolean",
+            "required": true,
+            "description": "True when the status code is below 400."
+          },
+          "body": {
+            "type": "string",
+            "required": true,
+            "description": "The response body as text; empty when Wait for Response is off."
+          },
+          "data": {
+            "type": "object",
+            "required": true,
+            "description": "The body parsed as JSON (an array as items, a scalar as value); empty when not JSON."
+          },
+          "headers": {
+            "type": "object",
+            "required": true,
+            "description": "The response headers."
+          },
+          "content_type": {
+            "type": "string",
+            "required": true,
+            "description": "The response Content-Type; empty when the server sent none."
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "required": true,
+            "description": "How long the request took, in milliseconds."
+          },
+          "error": {
+            "type": "string",
+            "required": true,
+            "description": "\"HTTP <code> <reason>\" when success is false; empty otherwise."
+          }
+        },
+        "artifact_type_input": "none",
+        "artifact_type_output": "none",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ]
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

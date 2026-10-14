@@ -1,0 +1,303 @@
+{
+  "_source": "the platform's seed feature definitions, get_schema() executed against the SDK and dumped with model_dump(mode='json')",
+  "schemas": {
+    "image_classifier": {
+      "properties": {
+        "image_id": {
+          "name": "image_id",
+          "dtype": "string",
+          "description": "Image identifier (e.g., cat_00123, dog_00456)",
+          "nullable": false,
+          "default": null
+        },
+        "feature_vector": {
+          "name": "feature_vector",
+          "dtype": "list[float64]",
+          "description": "512-dim ResNet18 feature embedding",
+          "nullable": false,
+          "default": null
+        },
+        "label": {
+          "name": "label",
+          "dtype": "int64",
+          "description": "Class label (0=cat, 1=dog)",
+          "nullable": false,
+          "default": null
+        },
+        "label_name": {
+          "name": "label_name",
+          "dtype": "string",
+          "description": "Human-readable class name",
+          "nullable": true,
+          "default": null
+        },
+        "event_timestamp": {
+          "name": "event_timestamp",
+          "dtype": "timestamp",
+          "description": "When the image was processed",
+          "nullable": false,
+          "default": null
+        }
+      },
+      "entity_key": [
+        "image_id"
+      ],
+      "timestamp_field": "event_timestamp",
+      "version": "1.0",
+      "description": "Image Classifier feature schema for dog/cat classification"
+    },
+    "recommender": {
+      "properties": {
+        "user_id": {
+          "name": "user_id",
+          "dtype": "string",
+          "description": "User identifier",
+          "nullable": false,
+          "default": null
+        },
+        "item_id": {
+          "name": "item_id",
+          "dtype": "string",
+          "description": "Item identifier",
+          "nullable": false,
+          "default": null
+        },
+        "event_timestamp": {
+          "name": "event_timestamp",
+          "dtype": "timestamp",
+          "description": "When the interaction occurred",
+          "nullable": false,
+          "default": null
+        },
+        "label": {
+          "name": "label",
+          "dtype": "int64",
+          "description": "Interaction label (1=positive, 0=negative)",
+          "nullable": false,
+          "default": 1
+        },
+        "age": {
+          "name": "age",
+          "dtype": "int64",
+          "description": "User age",
+          "nullable": true,
+          "default": null
+        },
+        "gender": {
+          "name": "gender",
+          "dtype": "string",
+          "description": "User gender (M/F/O)",
+          "nullable": true,
+          "default": null
+        },
+        "activity_level": {
+          "name": "activity_level",
+          "dtype": "string",
+          "description": "Activity level (low/medium/high)",
+          "nullable": true,
+          "default": null
+        },
+        "category": {
+          "name": "category",
+          "dtype": "string",
+          "description": "Item category",
+          "nullable": true,
+          "default": null
+        },
+        "price": {
+          "name": "price",
+          "dtype": "float64",
+          "description": "Item price",
+          "nullable": true,
+          "default": null
+        },
+        "avg_rating": {
+          "name": "avg_rating",
+          "dtype": "float64",
+          "description": "Average rating (1-5)",
+          "nullable": true,
+          "default": null
+        }
+      },
+      "entity_key": [
+        "user_id",
+        "item_id"
+      ],
+      "timestamp_field": "event_timestamp",
+      "version": "1.0",
+      "description": "NCF Recommender feature schema for user-item interactions"
+    },
+    "stock_predictor": {
+      "properties": {
+        "symbol": {
+          "name": "symbol",
+          "dtype": "string",
+          "description": "Stock ticker symbol (e.g., AAPL, MSFT)",
+          "nullable": false,
+          "default": null
+        },
+        "interval_time": {
+          "name": "interval_time",
+          "dtype": "string",
+          "description": "5-minute interval timestamp (YYYY-MM-DD HH:MM:SS)",
+          "nullable": false,
+          "default": null
+        },
+        "open": {
+          "name": "open",
+          "dtype": "float64",
+          "description": "Opening price for the 5-min candle",
+          "nullable": false,
+          "default": null
+        },
+        "high": {
+          "name": "high",
+          "dtype": "float64",
+          "description": "High price for the 5-min candle",
+          "nullable": false,
+          "default": null
+        },
+        "low": {
+          "name": "low",
+          "dtype": "float64",
+          "description": "Low price for the 5-min candle",
+          "nullable": false,
+          "default": null
+        },
+        "close": {
+          "name": "close",
+          "dtype": "float64",
+          "description": "Closing price for the 5-min candle",
+          "nullable": false,
+          "default": null
+        },
+        "volume": {
+          "name": "volume",
+          "dtype": "float64",
+          "description": "Trading volume for the 5-min candle",
+          "nullable": false,
+          "default": null
+        },
+        "close_norm": {
+          "name": "close_norm",
+          "dtype": "float64",
+          "description": "Normalized close price (relative to first close)",
+          "nullable": false,
+          "default": null
+        },
+        "returns": {
+          "name": "returns",
+          "dtype": "float64",
+          "description": "Close-to-close percentage change",
+          "nullable": false,
+          "default": null
+        },
+        "sma_20_ratio": {
+          "name": "sma_20_ratio",
+          "dtype": "float64",
+          "description": "SMA(20) / close price ratio",
+          "nullable": false,
+          "default": null
+        },
+        "sma_50_ratio": {
+          "name": "sma_50_ratio",
+          "dtype": "float64",
+          "description": "SMA(50) / close price ratio",
+          "nullable": false,
+          "default": null
+        },
+        "ema_12_ratio": {
+          "name": "ema_12_ratio",
+          "dtype": "float64",
+          "description": "EMA(12) / close price ratio",
+          "nullable": false,
+          "default": null
+        },
+        "ema_26_ratio": {
+          "name": "ema_26_ratio",
+          "dtype": "float64",
+          "description": "EMA(26) / close price ratio",
+          "nullable": false,
+          "default": null
+        },
+        "rsi_14": {
+          "name": "rsi_14",
+          "dtype": "float64",
+          "description": "RSI(14) normalized to 0-1 range",
+          "nullable": false,
+          "default": null
+        },
+        "macd_norm": {
+          "name": "macd_norm",
+          "dtype": "float64",
+          "description": "MACD line normalized by 1% of close",
+          "nullable": false,
+          "default": null
+        },
+        "macd_signal_norm": {
+          "name": "macd_signal_norm",
+          "dtype": "float64",
+          "description": "MACD signal line normalized",
+          "nullable": false,
+          "default": null
+        },
+        "macd_hist_norm": {
+          "name": "macd_hist_norm",
+          "dtype": "float64",
+          "description": "MACD histogram normalized",
+          "nullable": false,
+          "default": null
+        },
+        "bb_upper_ratio": {
+          "name": "bb_upper_ratio",
+          "dtype": "float64",
+          "description": "Bollinger upper band / close ratio",
+          "nullable": false,
+          "default": null
+        },
+        "bb_lower_ratio": {
+          "name": "bb_lower_ratio",
+          "dtype": "float64",
+          "description": "Bollinger lower band / close ratio",
+          "nullable": false,
+          "default": null
+        },
+        "volume_norm": {
+          "name": "volume_norm",
+          "dtype": "float64",
+          "description": "Volume normalized by rolling max",
+          "nullable": false,
+          "default": null
+        },
+        "high_low_range": {
+          "name": "high_low_range",
+          "dtype": "float64",
+          "description": "(High - Low) / Close",
+          "nullable": false,
+          "default": null
+        },
+        "open_close_range": {
+          "name": "open_close_range",
+          "dtype": "float64",
+          "description": "(Open - Close) / Close",
+          "nullable": false,
+          "default": null
+        },
+        "event_timestamp": {
+          "name": "event_timestamp",
+          "dtype": "timestamp",
+          "description": "When the record was processed",
+          "nullable": false,
+          "default": null
+        }
+      },
+      "entity_key": [
+        "symbol",
+        "interval_time"
+      ],
+      "timestamp_field": "event_timestamp",
+      "version": "1.0",
+      "description": "Stock Predictor feature schema - 5min intraday OHLCV with technical indicators"
+    }
+  }
+}

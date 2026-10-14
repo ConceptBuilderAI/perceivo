@@ -1,0 +1,265 @@
+{
+  "component": {
+    "additional_packages": null,
+    "artifact_type_input": "json",
+    "artifact_type_output": "json",
+    "asset_id": null,
+    "category": "AGENT",
+    "config": {
+      "detected_endpoints": [
+        {
+          "category": "http_client",
+          "library": "httpx",
+          "host": null,
+          "confidence": "detected",
+          "description": "HTTP client (httpx)"
+        },
+        {
+          "category": "http_client",
+          "library": "url_literal",
+          "host": "api.anthropic.com",
+          "confidence": "detected",
+          "description": "HTTP endpoint: api.anthropic.com"
+        },
+        {
+          "category": "http_client",
+          "library": "url_literal",
+          "host": "api.openai.com",
+          "confidence": "detected",
+          "description": "HTTP endpoint: api.openai.com"
+        },
+        {
+          "category": "http_client",
+          "library": "url_literal",
+          "host": "generativelanguage.googleapis.com",
+          "confidence": "detected",
+          "description": "HTTP endpoint: generativelanguage.googleapis.com"
+        },
+        {
+          "category": "perceivo_sdk",
+          "library": "perceivo.managed_service.ai",
+          "host": null,
+          "confidence": "detected",
+          "description": "Perceivo managed AI inference"
+        }
+      ],
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "provider",
+            "type": "select",
+            "label": "LLM Provider",
+            "options": [
+              "managed",
+              "anthropic",
+              "openai",
+              "google"
+            ],
+            "default": "managed",
+            "required": true,
+            "description": "managed runs on platform credentials; any other provider needs the api_key secret."
+          },
+          {
+            "name": "model",
+            "type": "select",
+            "label": "Model",
+            "default": "gpt-5.2 ($2/$8 per 1M)",
+            "required": true,
+            "description": "A model of the chosen provider, from the platform's model catalogue.",
+            "depends_on": {
+              "options_map": {
+                "anthropic": [
+                  "claude-opus-4-8 ($5/$25 per 1M)",
+                  "claude-sonnet-5 ($3/$15 per 1M)",
+                  "claude-fable-5 ($10/$50 per 1M)",
+                  "claude-opus-4-6 ($5/$25 per 1M)",
+                  "claude-haiku-4-5-20251001 ($0.8/$4 per 1M)"
+                ],
+                "google": [
+                  "gemini-2.0-flash ($0.1/$0.4 per 1M)",
+                  "gemini-1.5-pro ($1.25/$5 per 1M)",
+                  "gemini-1.5-flash ($0.075/$0.3 per 1M)"
+                ],
+                "managed": [
+                  "gpt-5.2 ($2/$8 per 1M)",
+                  "gpt-5-nano ($0.15/$0.6 per 1M)",
+                  "o4-mini ($1.1/$4.4 per 1M)",
+                  "grok-4-1-fast-reasoning ($3/$15 per 1M)"
+                ],
+                "openai": [
+                  "gpt-4o ($2.5/$10 per 1M)",
+                  "gpt-4o-mini ($0.15/$0.6 per 1M)",
+                  "gpt-4-turbo ($10/$30 per 1M)",
+                  "o1 ($15/$60 per 1M)",
+                  "o3-mini ($1.1/$4.4 per 1M)",
+                  "o4-mini ($1.1/$4.4 per 1M)"
+                ]
+              },
+              "parameter": "provider"
+            }
+          },
+          {
+            "name": "user_prompt",
+            "type": "text_long",
+            "label": "User Prompt",
+            "default": "${prompt}",
+            "description": "The message. ${field} or ${nested.field} is filled from incoming data. When blank, or when a named field is missing, the incoming artifact or data is sent instead."
+          },
+          {
+            "name": "system_prompt",
+            "type": "text_long",
+            "label": "System Prompt",
+            "default": "You are a helpful assistant.",
+            "required": true,
+            "description": "Standing instruction for the model. ${field} placeholders are filled from incoming data."
+          },
+          {
+            "name": "temperature",
+            "type": "number",
+            "label": "Temperature",
+            "default": 0.7,
+            "constraints": {
+              "min": 0,
+              "max": 2,
+              "step": 0.1
+            },
+            "description": "Lower is more predictable, higher more varied. Not sent to models that refuse it."
+          },
+          {
+            "name": "max_tokens",
+            "type": "integer",
+            "label": "Max Tokens",
+            "default": 4000,
+            "constraints": {
+              "min": 100,
+              "max": 100000
+            },
+            "description": "Ceiling on the reply length. Reasoning models spend part of it thinking."
+          },
+          {
+            "name": "reasoning_effort",
+            "type": "select",
+            "label": "Reasoning Effort",
+            "options": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "",
+            "description": "Managed reasoning models only. Hidden reasoning tokens count against Max Tokens, so a high effort with a small budget returns no text. Leave blank to let the model decide."
+          }
+        ],
+        "values": {
+          "max_tokens": 4000,
+          "model": "gpt-5.2 ($2/$8 per 1M)",
+          "provider": "managed",
+          "reasoning_effort": "",
+          "system_prompt": "You are a helpful assistant.",
+          "temperature": 0.7,
+          "user_prompt": "${prompt}"
+        }
+      },
+      "port_order": [
+        "input",
+        "output"
+      ],
+      "port_sides": {
+        "input": "left",
+        "output": "right"
+      },
+      "required_secrets": [
+        {
+          "name": "api_key",
+          "label": "API Key",
+          "required": false,
+          "description": "Provider API key. Required for anthropic, openai and google; unused for the managed provider."
+        }
+      ],
+      "icon": {
+        "type": "lucide",
+        "value": "sparkles"
+      }
+    },
+    "description": "What it does Sends a prompt to a large language model and returns the reply. This is the one component for every model in the platform's model catalogue, rather than one component per model.\n\nHow it works Pick a provider and a model, write the prompts, and it makes the call. The model list comes from the platform's model catalogue, so a model added there becomes selectable here without rebuilding a flow. The managed provider runs on platform credentials, so you bind nothing; anthropic, openai and google are called directly with your organization's own key, bound as a secret and never written into the template. Anything in ${braces} is filled from the data arriving at the node; if the user prompt is blank or names a field that did not arrive, the incoming data itself is sent. The tokens used are priced from the catalogue and recorded against the run. A wrong setting fails before any call is made, and a failed call or an answer with no text fails the run rather than passing an empty answer on.\n\nConfigure\n- LLM Provider - managed (default, platform credentials), anthropic, openai or google.\n- Model - a model of that provider, from the catalogue. gpt-5.2 by default.\n- System Prompt - the standing instruction. \"You are a helpful assistant.\" by default.\n- User Prompt - the message. ${prompt} by default, meaning the prompt field of the incoming data.\n- Temperature - 0 to 2, 0.7 by default. Not sent to models that refuse it.\n- Max Tokens - ceiling on the reply length, 4000 by default.\n- Reasoning Effort - low, medium or high, for managed reasoning models. Blank leaves it to the model.\n- API Key - bind the organization secret holding the provider key; not needed for managed.\n\nIn and out In: data whose fields fill the ${...} placeholders, or a JSON artifact to send as it is. Out: the reply, the model and provider that answered, the input and output token counts, and a one-line summary of the call, as data and as a JSON artifact.\n\nUse it when\n- Any step of a flow needs text generated, summarised, classified or rewritten.\n- You want to switch models or providers later without rebuilding the flow.\n- You need the token cost of a step recorded against the run.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: agent\nname: LLM Request\ndescription: >\n  Sends one prompt to a model in the platform's model catalogue and returns\n  the reply with its token counts. The managed provider runs on platform\n  credentials through perceivo.managed_service.ai; anthropic, openai and\n  google are called directly with the api_key secret. ${field} placeholders in\n  the prompts are filled from request_data, and the token cost is recorded on\n  the run at the catalogue rate. A misconfigured node raises before any call;\n  a failed call or an empty reply raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The artifact is read only as a fallback for the user message, behind a\n    # None guard, so it is welcome but never required.\n    artifact_type_input: optional(json)\n    artifact_type_output: json\n    # Placeholders read request_data by whatever name the prompts give, so no\n    # key is required. `prompt` is the one the default User Prompt reads.\n    request_data:\n      prompt: string (optional) - The user message, read by the default User Prompt ${prompt}.\n    response_data:\n      response: string - The model's reply.\n      tokens_in: integer - Prompt tokens consumed.\n      tokens_out: integer - Reply tokens consumed, including any reasoning tokens.\n      model: string - The model that answered.\n      provider: string - The provider that answered.\n      conversation_log: string - One-line summary of the call.\n\nrequired_secrets:\n  - name: api_key\n    label: API Key\n    required: false\n    description: Provider API key. Required for anthropic, openai and google; unused for the managed provider.\n\ninput_parameters:\n  - name: provider\n    type: select\n    label: LLM Provider\n    options: [managed, anthropic, openai, google]\n    default: managed\n    required: true\n    description: managed runs on platform credentials; any other provider needs the api_key secret.\n  - name: model\n    type: select\n    label: Model\n    default: gpt-5.2 ($2/$8 per 1M)\n    required: true\n    description: A model of the chosen provider, from the platform's model catalogue.\n  - name: user_prompt\n    type: text_long\n    label: User Prompt\n    default: ${prompt}\n    description: The message. ${field} or ${nested.field} is filled from incoming data. When blank, or when a named field is missing, the incoming artifact or data is sent instead.\n  - name: system_prompt\n    type: text_long\n    label: System Prompt\n    default: You are a helpful assistant.\n    required: true\n    description: Standing instruction for the model. ${field} placeholders are filled from incoming data.\n  - name: temperature\n    type: number\n    label: Temperature\n    default: 0.7\n    constraints: {min: 0, max: 2, step: 0.1}\n    description: Lower is more predictable, higher more varied. Not sent to models that refuse it.\n  - name: max_tokens\n    type: integer\n    label: Max Tokens\n    default: 4000\n    constraints: {min: 100, max: 100000}\n    description: Ceiling on the reply length. Reasoning models spend part of it thinking.\n  - name: reasoning_effort\n    type: select\n    label: Reasoning Effort\n    options: [low, medium, high]\n    default: \"\"\n    description: Managed reasoning models only. Hidden reasoning tokens count against Max Tokens, so a high effort with a small budget returns no text. Leave blank to let the model decide.\n",
+    "name": "LLM REQUEST (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "json",
+        "artifact_types": [
+          "json"
+        ],
+        "base_schema": null,
+        "contract": {},
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "multi_artifact": false,
+        "port_type": "in",
+        "post_tool_contract": null,
+        "request_data_schema": {
+          "prompt": {
+            "type": "string",
+            "required": false,
+            "description": "The user message, read by the default User Prompt ${prompt}."
+          }
+        },
+        "response_data_passthrough_except": null,
+        "response_data_schema": {
+          "response": {
+            "type": "string",
+            "required": true,
+            "description": "The model's reply."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "required": true,
+            "description": "Prompt tokens consumed."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "required": true,
+            "description": "Reply tokens consumed, including any reasoning tokens."
+          },
+          "model": {
+            "type": "string",
+            "required": true,
+            "description": "The model that answered."
+          },
+          "provider": {
+            "type": "string",
+            "required": true,
+            "description": "The provider that answered."
+          },
+          "conversation_log": {
+            "type": "string",
+            "required": true,
+            "description": "One-line summary of the call."
+          }
+        },
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "\"\"\"LLM Request: one call to a model in the platform's model catalogue.\n\nThe managed provider is a platform-run Azure AI Foundry deployment reached\nthrough ``perceivo.managed_service.ai``, authenticated server-side, so nothing\nis bound on the node. Every other provider is called directly with the\norganization's own key, read by NAME from the ``api_key`` secret.\n\nThe component records no cost itself. A managed call is booked by the AI\nFoundry proxy from Azure's own token counts, including a call that returns no\ntext; an own-key call is billed by the platform from the tokens_in, tokens_out,\nprovider and model in this component's response_data. A cost.record here would\nbook the same tokens a second time.\n\"\"\"\n\nimport json\nimport re\n\nimport httpx\nimport perceivo\n\n_PROVIDERS = (\"managed\", \"anthropic\", \"openai\", \"google\")\n_REASONING_EFFORTS = (\"low\", \"medium\", \"high\")\n_DEFAULT_MODEL = \"gpt-5.2\"\n_DEFAULT_SYSTEM_PROMPT = \"You are a helpful assistant.\"\n_DEFAULT_USER_PROMPT = \"${prompt}\"\n_TIMEOUT_SECONDS = 120.0\n\n# Bring-your-own-key endpoints. The managed provider never uses these.\n_ANTHROPIC_URL = \"https://api.anthropic.com/v1/messages\"\n_OPENAI_URL = \"https://api.openai.com/v1/chat/completions\"\n_GOOGLE_URL = \"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent\"\n\n# ${field} or ${nested.field}, filled from the inbound request_data.\n_PLACEHOLDER = re.compile(r\"\\$\\{([\\w.]+)\\}\")\n_ABSENT = object()\n\n\ndef _lookup(data, path: str):\n    \"\"\"The value at a dotted path inside nested dicts, or _ABSENT.\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if not isinstance(value, dict) or part not in value:\n            return _ABSENT\n        value = value[part]\n    return value\n\n\ndef _as_text(value) -> str:\n    return value if isinstance(value, str) else json.dumps(value, default=str)\n\n\ndef _fill(template: str, data: dict) -> str:\n    \"\"\"Replace each ${path} found in data; leave unknown placeholders as written.\"\"\"\n\n    def _replace(match):\n        value = _lookup(data, match.group(1))\n        return match.group(0) if value is _ABSENT else _as_text(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _text_param(name: str, default: str) -> str:\n    value = perceivo.params.get(name, default)\n    return default if value is None else str(value)\n\n\ndef _number_param(name: str, label: str, default, low, high, integer: bool = False):\n    \"\"\"A numeric node parameter, checked against the range the Inspector offers.\"\"\"\n    raw = perceivo.params.get(name, default)\n    if raw is None or raw == \"\":\n        raw = default\n    try:\n        value = float(raw)\n    except (TypeError, ValueError):\n        raise ValueError(f\"{label} is {raw!r}; it must be a number.\") from None\n    if integer:\n        if not value.is_integer():\n            raise ValueError(f\"{label} is {raw!r}; it must be a whole number.\")\n        value = int(value)\n    if not low <= value <= high:\n        raise ValueError(f\"{label} is {raw!r}; it must be between {low} and {high}.\")\n    return value\n\n\ndef _user_message(artifact_data, request_data: dict) -> str:\n    \"\"\"The User Prompt with its placeholders filled, or the inbound data itself.\n\n    When the prompt is blank, or names a field the inbound data does not carry,\n    the inbound artifact is sent instead, then the whole request_data as JSON.\n    \"\"\"\n    prompt = _fill(_text_param(\"user_prompt\", _DEFAULT_USER_PROMPT), request_data).strip()\n    if prompt and not _PLACEHOLDER.search(prompt):\n        return prompt\n    if artifact_data not in (None, \"\", {}, []):\n        return _as_text(artifact_data)\n    if request_data:\n        return json.dumps(request_data, default=str)\n    raise ValueError(\n        \"There is nothing to send to the model: the User Prompt is empty or names \"\n        \"a field the incoming data does not carry, and no data arrived at the node. \"\n        f\"Fields received: {sorted(request_data)}.\"\n    )\n\n\ndef _anthropic_rejects_sampling(model: str) -> bool:\n    \"\"\"True for Anthropic models that refuse temperature (Opus 4.7+, Sonnet 5+, Fable, Mythos).\n\n    Opus 4.6 and earlier, Sonnet 4.x, Haiku and the legacy claude-3 ids still\n    accept it. Detected by name so a new model of the same family is covered.\n    \"\"\"\n    name = model.lower().strip()\n    if \"fable\" in name or \"mythos\" in name:\n        return True\n    match = re.search(r\"(?:^|claude-)(opus|sonnet|haiku)-(\\d+)(?:-(\\d{1,2})(?!\\d))?\", name)\n    if not match:\n        return False\n    family, major = match.group(1), int(match.group(2))\n    minor = int(match.group(3)) if match.group(3) else 0\n    if family == \"opus\":\n        return (major, minor) >= (4, 7)\n    if family == \"sonnet\":\n        return major >= 5\n    return False\n\n\ndef _openai_is_reasoning(model: str) -> bool:\n    \"\"\"o-series and the non-chat gpt-5 family take max_completion_tokens and no temperature.\"\"\"\n    name = model.lower().strip()\n    return bool(re.match(r\"o\\d\", name)) or (name.startswith(\"gpt-5\") and \"chat\" not in name)\n\n\ndef _provider_error(provider: str, response: httpx.Response, api_key: str) -> RuntimeError:\n    \"\"\"A failed provider call as an error naming the status and the provider's message.\n\n    Only the provider's own error message is kept, never the raw body, and the\n    key is masked in case the provider echoed it back.\n    \"\"\"\n    try:\n        body = response.json()\n    except ValueError:\n        body = None\n    message = \"\"\n    if isinstance(body, dict):\n        error = body.get(\"error\")\n        if isinstance(error, dict):\n            message = str(error.get(\"message\") or \"\")\n        elif isinstance(error, str):\n            message = error\n    message = message or response.reason_phrase or \"\"\n    if api_key:\n        message = message.replace(api_key, \"***\")\n    message = message[:300]\n    return RuntimeError(f\"{provider} API error {response.status_code}: {message}\")\n\n\nasync def _post(provider: str, url: str, headers: dict, body: dict, api_key: str) -> dict:\n    \"\"\"POST a JSON body. Redirects are not followed; a non-200 status raises.\"\"\"\n    async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:\n        response = await client.post(url, headers=headers, json=body)\n    if response.status_code != 200:\n        raise _provider_error(provider, response, api_key)\n    return response.json()\n\n\nasync def _call_managed(\n    model, system_prompt, user_message, temperature, max_tokens, reasoning_effort\n):\n    options = {\"temperature\": temperature, \"max_tokens\": max_tokens}\n    if reasoning_effort:\n        options[\"reasoning_effort\"] = reasoning_effort\n    response = await perceivo.managed_service.ai.invoke(\n        perceivo.types.AIService.CHAT,\n        model=model,\n        messages=[{\"role\": \"user\", \"content\": user_message}],\n        system_prompt=system_prompt,\n        **options,\n    )\n    choice = (response.get(\"choices\") or [{}])[0] or {}\n    usage = response.get(\"usage\") or {}\n    return {\n        \"text\": (choice.get(\"message\") or {}).get(\"content\") or \"\",\n        \"finish_reason\": choice.get(\"finish_reason\") or \"\",\n        # Current SDKs add tokens_in/tokens_out; an older runtime leaves only the\n        # provider's usage block, so it is read when they are absent.\n        \"tokens_in\": int(response.get(\"tokens_in\") or usage.get(\"prompt_tokens\") or 0),\n        \"tokens_out\": int(response.get(\"tokens_out\") or usage.get(\"completion_tokens\") or 0),\n    }\n\n\nasync def _call_anthropic(api_key, model, system_prompt, user_message, temperature, max_tokens):\n    body = {\n        \"model\": model,\n        \"max_tokens\": max_tokens,\n        \"system\": system_prompt,\n        \"messages\": [{\"role\": \"user\", \"content\": user_message}],\n    }\n    if not _anthropic_rejects_sampling(model):\n        body[\"temperature\"] = temperature\n    headers = {\"x-api-key\": api_key, \"anthropic-version\": \"2023-06-01\"}\n    result = await _post(\"anthropic\", _ANTHROPIC_URL, headers, body, api_key)\n    usage = result.get(\"usage\") or {}\n    blocks = result.get(\"content\") or []\n    return {\n        # Only text blocks are the answer; thinking and tool blocks are not.\n        \"text\": \"\".join(\n            b.get(\"text\") or \"\" for b in blocks if isinstance(b, dict) and b.get(\"type\") == \"text\"\n        ),\n        \"finish_reason\": result.get(\"stop_reason\") or \"\",\n        \"tokens_in\": int(usage.get(\"input_tokens\") or 0),\n        \"tokens_out\": int(usage.get(\"output_tokens\") or 0),\n    }\n\n\nasync def _call_openai(api_key, model, system_prompt, user_message, temperature, max_tokens):\n    body = {\n        \"model\": model,\n        \"messages\": [\n            {\"role\": \"system\", \"content\": system_prompt},\n            {\"role\": \"user\", \"content\": user_message},\n        ],\n    }\n    if _openai_is_reasoning(model):\n        body[\"max_completion_tokens\"] = max_tokens\n    else:\n        body[\"max_tokens\"] = max_tokens\n        body[\"temperature\"] = temperature\n    headers = {\"Authorization\": f\"Bearer {api_key}\"}\n    result = await _post(\"openai\", _OPENAI_URL, headers, body, api_key)\n    usage = result.get(\"usage\") or {}\n    choice = (result.get(\"choices\") or [{}])[0] or {}\n    return {\n        \"text\": (choice.get(\"message\") or {}).get(\"content\") or \"\",\n        \"finish_reason\": choice.get(\"finish_reason\") or \"\",\n        \"tokens_in\": int(usage.get(\"prompt_tokens\") or 0),\n        \"tokens_out\": int(usage.get(\"completion_tokens\") or 0),\n    }\n\n\nasync def _call_google(api_key, model, system_prompt, user_message, temperature, max_tokens):\n    body = {\n        \"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": user_message}]}],\n        \"systemInstruction\": {\"parts\": [{\"text\": system_prompt}]},\n        \"generationConfig\": {\"temperature\": temperature, \"maxOutputTokens\": max_tokens},\n    }\n    # The key travels in a header, never in the URL, so it cannot reach a log line.\n    headers = {\"x-goog-api-key\": api_key}\n    result = await _post(\"google\", _GOOGLE_URL.format(model=model), headers, body, api_key)\n    usage = result.get(\"usageMetadata\") or {}\n    candidate = (result.get(\"candidates\") or [{}])[0] or {}\n    parts = (candidate.get(\"content\") or {}).get(\"parts\") or []\n    finish_reason = candidate.get(\"finishReason\") or \"\"\n    if not candidate:\n        # A prompt blocked before generation carries no candidate at all.\n        finish_reason = str((result.get(\"promptFeedback\") or {}).get(\"blockReason\") or \"\")\n    return {\n        \"text\": \"\".join(p.get(\"text\") or \"\" for p in parts if isinstance(p, dict)),\n        \"finish_reason\": finish_reason,\n        \"tokens_in\": int(usage.get(\"promptTokenCount\") or 0),\n        \"tokens_out\": int(usage.get(\"candidatesTokenCount\") or 0),\n    }\n\n\ndef _preview(text: str, limit: int) -> str:\n    flat = \" \".join(text.split())\n    return flat if len(flat) <= limit else flat[:limit] + \"...\"\n\n\n@perceivo.agent\nasync def llm_request(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Send one prompt to the configured provider and model and return the reply.\n\n    Provider, model, prompts and sampling settings are node parameters. ${field}\n    placeholders in either prompt are filled from the inbound request_data.\n\n    A misconfigured node raises ValueError before any call is made. A failed\n    call raises and is not caught, and a reply with no text raises RuntimeError:\n    the run fails rather than passing an empty answer downstream.\n    \"\"\"\n    request_data = input.request_data or {}\n\n    provider = _text_param(\"provider\", \"managed\").strip().lower() or \"managed\"\n    if provider not in _PROVIDERS:\n        raise ValueError(f\"LLM Provider is {provider!r}. Choose one of: {', '.join(_PROVIDERS)}.\")\n    # The Inspector labels each model with its price, e.g. \"gpt-5.2 ($2/$8 per 1M)\".\n    model = _text_param(\"model\", _DEFAULT_MODEL).split(\" (\")[0].strip()\n    if not model:\n        raise ValueError(\"Model is empty. Choose a model for the selected provider.\")\n    temperature = _number_param(\"temperature\", \"Temperature\", 0.7, 0, 2)\n    max_tokens = _number_param(\"max_tokens\", \"Max Tokens\", 4000, 100, 100_000, integer=True)\n    reasoning_effort = _text_param(\"reasoning_effort\", \"\").strip().lower()\n    if reasoning_effort and reasoning_effort not in _REASONING_EFFORTS:\n        raise ValueError(\n            f\"Reasoning Effort is {reasoning_effort!r}. Choose one of: \"\n            f\"{', '.join(_REASONING_EFFORTS)}, or leave it blank.\"\n        )\n    if reasoning_effort and provider != \"managed\":\n        raise ValueError(\n            f\"Reasoning Effort applies to the managed provider only; clear it for {provider}.\"\n        )\n    system_prompt = (\n        _fill(_text_param(\"system_prompt\", _DEFAULT_SYSTEM_PROMPT), request_data).strip()\n        or _DEFAULT_SYSTEM_PROMPT\n    )\n    artifact_data = input.artifact.data if input.artifact is not None else None\n    user_message = _user_message(artifact_data, request_data)\n\n    api_key = \"\"\n    if provider != \"managed\":\n        api_key = await perceivo.secrets.get(\"api_key\", None)\n        if not api_key:\n            raise ValueError(\n                f\"LLM Provider is {provider} but no api_key secret is bound. Bind the \"\n                \"organization's key in the Inspector, or choose the managed provider.\"\n            )\n\n    perceivo.log.info(\n        \"Calling LLM\",\n        provider=provider,\n        model=model,\n        temperature=temperature,\n        max_tokens=max_tokens,\n        reasoning_effort=reasoning_effort or None,\n        prompt_chars=len(user_message),\n    )\n    if provider == \"managed\":\n        result = await _call_managed(\n            model, system_prompt, user_message, temperature, max_tokens, reasoning_effort\n        )\n    else:\n        call = {\"anthropic\": _call_anthropic, \"openai\": _call_openai, \"google\": _call_google}\n        result = await call[provider](\n            api_key, model, system_prompt, user_message, temperature, max_tokens\n        )\n\n    reply = result[\"text\"]\n    tokens_in, tokens_out = result[\"tokens_in\"], result[\"tokens_out\"]\n\n    if not reply.strip():\n        raise RuntimeError(\n            f\"{provider}/{model} returned no text (finish_reason=\"\n            f\"{result['finish_reason'] or 'unset'}, completion_tokens={tokens_out}, \"\n            f\"max_tokens={max_tokens}). A reasoning model can spend the whole budget before \"\n            \"answering: raise Max Tokens or lower Reasoning Effort.\"\n        )\n\n    summary = (\n        f\"[LLM via {provider}/{model}] Role: {_preview(system_prompt, 150)} | \"\n        f\"Processed {len(user_message)} chars of input. \"\n        f\"Response ({len(reply)} chars): {_preview(reply, 200)}\"\n    )\n    perceivo.log.info(\n        \"LLM replied\",\n        provider=provider,\n        model=model,\n        reply_chars=len(reply),\n        tokens_in=tokens_in,\n        tokens_out=tokens_out,\n    )\n\n    response_data = {\n        \"response\": reply,\n        \"tokens_in\": tokens_in,\n        \"tokens_out\": tokens_out,\n        \"model\": model,\n        \"provider\": provider,\n        \"conversation_log\": summary,\n    }\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=dict(response_data),\n            mime_type=\"application/json\",\n        ),\n        response_data=response_data,\n    )\n",
+    "short_description": "Sends a prompt to any model in the platform's model catalogue - managed or with your own key - and returns the reply with its token counts.",
+    "tags": [
+      "template",
+      "agent",
+      "llm"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-10-06T00:00:00Z"
+}

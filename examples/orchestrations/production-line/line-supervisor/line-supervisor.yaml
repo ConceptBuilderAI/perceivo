@@ -1,0 +1,67 @@
+extension_type: AGENT
+name: Line Supervisor
+description: Starts the production line by calling the first stage, Cut, and reports the result.
+tags:
+  - beginner
+  - agent
+input_ports:
+  - port_name: input
+    port_type: in
+    artifact_type_input: none
+    artifact_type_output: text
+    request_data:
+      product:
+        type: string
+        description: What the line should make.
+      seconds_per_stage:
+        type: integer
+        description: How long each stage works.
+    response_data:
+      product:
+        type: string
+        description: What the line made.
+      stages_completed:
+        type: integer
+        description: How many stages finished.
+      passed:
+        type: boolean
+        description: Whether the product passed inspection.
+tool_ports:
+  - port_name: first_stage
+    port_type: tool
+    artifact_type_input: none
+    artifact_type_output: none
+    request_data:
+      product:
+        type: string
+        description: What the line is making.
+      seconds:
+        type: integer
+        description: How long each stage works.
+      traveler:
+        type: string
+        description: The record of stages finished so far (empty to begin).
+    response_data:
+      traveler:
+        type: string
+        description: The record of every stage, ending with Inspection.
+      passed:
+        type: boolean
+        description: Whether the product passed inspection.
+output_ports:
+- port_name: output
+  port_type: out
+  artifact_type_input: text
+  artifact_type_output: text
+  response_data:
+    product:
+      type: string
+      description: What the line made.
+    stages_completed:
+      type: integer
+      description: How many stages finished.
+    passed:
+      type: boolean
+      description: Whether the product passed inspection.
+input_parameters: []
+required_secrets: []

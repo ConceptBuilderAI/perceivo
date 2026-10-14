@@ -1,0 +1,137 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "MCP TOOL RUNNER (SYSTEM, READ-ONLY)",
+    "category": "TOOL",
+    "description": "What it does Gives an orchestration or an agent access to every tool registered on the organization's MCP (Model Context Protocol) server. It calls one tool by name with arguments and returns its result, or lists the tools the server offers together with their descriptions and argument schemas.\n\nHow it works The node connects to the organization's own MCP server, which is deployed in Infrastructure like Redis or Milvus. It reads the server's tool list first, so a name the server does not offer comes back as a result with success false and the names that are available, rather than as an opaque failure. A tool that reports an error is also returned with success false and the error text, so an agent can correct its arguments and try again. An MCP server that is not running, or a bad setting, fails the run.\n\nConfigure\n- Default Tool - the tool to call when the incoming data names none; leave it empty to choose at runtime.\n- When No Tool Is Given - list_available (default) returns the tool list; error fails the run.\n\nIn and out In: optional tool_name, arguments (an object matching the tool's input schema) and list_tools. Out: success, tool_name, result (the tool's result object, tools when listing, or available_tools when the name was not found) and error.\n\nUse it when\n- An agent needs to discover and call tools hosted on the organization's MCP server.\n- An orchestration step should run one specific MCP tool with arguments built upstream.\n- You want to check which MCP tools are available before wiring them in.",
+    "short_description": "Calls a tool on the organization's MCP server by name, or lists the tools it offers.",
+    "tags": [
+      "template",
+      "tool",
+      "mcp",
+      "integration"
+    ],
+    "config": {
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "required_secrets": [],
+      "icon": {
+        "type": "lucide",
+        "value": "plug"
+      },
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "default_tool_name",
+            "type": "text",
+            "label": "Default Tool",
+            "description": "The tool to call when request_data gives no tool_name. Leave empty to choose at runtime."
+          },
+          {
+            "name": "list_on_empty",
+            "type": "select",
+            "label": "When No Tool Is Given",
+            "options": [
+              "list_available",
+              "error"
+            ],
+            "default": "list_available",
+            "description": "list_available returns the server's tools; error fails the run."
+          }
+        ],
+        "values": {
+          "default_tool_name": "",
+          "list_on_empty": "list_available"
+        }
+      },
+      "detected_endpoints": [
+        {
+          "category": "perceivo_sdk",
+          "library": "perceivo.cluster.mcp",
+          "host": null,
+          "confidence": "detected",
+          "description": "Perceivo MCP server tools"
+        }
+      ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "script": "import perceivo\n\n_ON_MISSING = (\"list_available\", \"error\")\n_FALSY = (\"false\", \"0\", \"no\", \"off\", \"\")\n\n\ndef _flag(value) -> bool:\n    if isinstance(value, bool):\n        return value\n    if value is None:\n        return False\n    return str(value).strip().lower() not in _FALSY\n\n\ndef _tool_summary(tool) -> dict:\n    if not isinstance(tool, dict):\n        return {\"name\": str(tool), \"description\": \"\", \"input_schema\": {}}\n    return {\n        \"name\": str(tool.get(\"name\", \"\")),\n        \"description\": str(tool.get(\"description\", \"\") or \"\"),\n        \"input_schema\": tool.get(\"input_schema\") or {},\n    }\n\n\ndef _result(\n    success: bool, tool_name: str, result: dict, error: str = \"\"\n) -> perceivo.primitives.ToolOutput:\n    return perceivo.primitives.ToolOutput(\n        response_data={\"success\": success, \"tool_name\": tool_name, \"result\": result, \"error\": error}\n    )\n\n\n@perceivo.tool\nasync def mcp_tool_runner(input: perceivo.primitives.ToolInput) -> perceivo.primitives.ToolOutput:\n    \"\"\"Call one tool on the organization's MCP server, or list the tools it offers.\n\n    The tool name comes from request_data.tool_name, else the Default Tool\n    parameter. A tool that reports an error, or a name the server does not\n    offer, is returned as data with success false so the caller can recover;\n    an MCP server that is not running, or a bad setting, fails the run.\n    \"\"\"\n    request = input.request_data or {}\n    if not isinstance(request, dict):\n        raise ValueError(\"request_data must be an object.\")\n\n    on_missing = str(\n        perceivo.params.get(\"list_on_empty\", \"list_available\") or \"list_available\"\n    ).strip()\n    if on_missing not in _ON_MISSING:\n        raise ValueError(\n            f\"When No Tool Is Given is '{on_missing}'; use one of {', '.join(_ON_MISSING)}.\"\n        )\n\n    arguments = request.get(\"arguments\")\n    if arguments is None:\n        arguments = {}\n    if not isinstance(arguments, dict):\n        raise ValueError(\"request_data.arguments must be an object of the tool's arguments.\")\n\n    tool_name = str(\n        request.get(\"tool_name\") or perceivo.params.get(\"default_tool_name\", \"\") or \"\"\n    ).strip()\n    list_only = _flag(request.get(\"list_tools\"))\n    if not tool_name and not list_only:\n        if on_missing == \"error\":\n            raise ValueError(\n                \"No tool to call: set request_data.tool_name or the Default Tool parameter.\"\n            )\n        list_only = True\n\n    mcp = await perceivo.cluster.mcp.connect()\n    if not await mcp.is_available():\n        raise RuntimeError(\n            \"The organization's MCP server is not running. Start it in Infrastructure before using this tool.\"\n        )\n\n    tools = [_tool_summary(t) for t in await mcp.list_tools()]\n    if list_only:\n        perceivo.log.info(\"Listed MCP tools\", count=len(tools))\n        return _result(True, \"\", {\"tools\": tools})\n\n    available = sorted(t[\"name\"] for t in tools)\n    if tool_name not in available:\n        perceivo.log.warning(\"MCP tool not found\", tool_name=tool_name, available=len(available))\n        return _result(\n            False,\n            tool_name,\n            {\"available_tools\": available},\n            f\"Tool '{tool_name}' is not offered by the MCP server.\",\n        )\n\n    try:\n        outcome = await mcp.call_tool(tool_name, arguments)\n    except RuntimeError:\n        raise\n    except Exception as exc:\n        perceivo.log.warning(\"MCP tool failed\", tool_name=tool_name, error_type=type(exc).__name__)\n        return _result(False, tool_name, {}, f\"{type(exc).__name__}: {exc}\")\n\n    result = outcome if isinstance(outcome, dict) else {\"value\": outcome}\n    perceivo.log.info(\"Called MCP tool\", tool_name=tool_name)\n    return _result(True, tool_name, result)\n",
+    "manifest_yaml": "extension_type: tool\nname: MCP Tool Runner\ndescription: >\n  Calls one tool registered on the organization's MCP server, by name and\n  with arguments, or lists the tools the server offers. A tool error or an\n  unknown tool is returned as data with success false; an MCP server that is\n  not running fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # A TOOL reached by an INVOKE edge, or a step in a flow. The result is\n    # data, not an artifact, so both halves are none.\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      tool_name: string (optional) - The MCP tool to call; overrides Default Tool.\n      arguments: object (optional) - Arguments matching the tool's input schema.\n      list_tools: boolean (optional) - When true, list the available tools instead of calling one.\n    response_data:\n      success: boolean - True when the tool ran (or the list was read) without error.\n      tool_name: string - The tool that was called; empty when listing.\n      result: object - The tool's result (a non-object result as value), or tools when listing, or available_tools when the tool was not found.\n      error: string - Why success is false; empty otherwise.\n\ninput_parameters:\n  - name: default_tool_name\n    type: text\n    label: Default Tool\n    description: The tool to call when request_data gives no tool_name. Leave empty to choose at runtime.\n  - name: list_on_empty\n    type: select\n    label: When No Tool Is Given\n    options: [list_available, error]\n    default: list_available\n    description: list_available returns the server's tools; error fails the run.\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "tool_name": {
+            "type": "string",
+            "required": false,
+            "description": "The MCP tool to call; overrides Default Tool."
+          },
+          "arguments": {
+            "type": "object",
+            "required": false,
+            "description": "Arguments matching the tool's input schema."
+          },
+          "list_tools": {
+            "type": "boolean",
+            "required": false,
+            "description": "When true, list the available tools instead of calling one."
+          }
+        },
+        "response_data_schema": {
+          "success": {
+            "type": "boolean",
+            "required": true,
+            "description": "True when the tool ran (or the list was read) without error."
+          },
+          "tool_name": {
+            "type": "string",
+            "required": true,
+            "description": "The tool that was called; empty when listing."
+          },
+          "result": {
+            "type": "object",
+            "required": true,
+            "description": "The tool's result (a non-object result as value), or tools when listing, or available_tools when the tool was not found."
+          },
+          "error": {
+            "type": "string",
+            "required": true,
+            "description": "Why success is false; empty otherwise."
+          }
+        },
+        "artifact_type_input": "none",
+        "artifact_type_output": "none",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ]
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

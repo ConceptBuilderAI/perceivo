@@ -1,0 +1,102 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:55:56.541118Z",
+  "component": {
+    "asset_id": null,
+    "name": "Shipping",
+    "category": "END",
+    "description": "Ships the product if it passed inspection, and returns the traveler.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "end"
+    ],
+    "config": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\nfrom perceivo.primitives import EndInput, EndOutput\n\n\n@perceivo.end\nasync def shipping(input: EndInput) -> EndOutput:\n    \"\"\"Ship the product, or hold it if it failed inspection.\"\"\"\n    passed = input.response_data.get(\"passed\", False)\n\n    return EndOutput(\n        artifact=input.artifact,\n        response_data={\n            \"product\": input.response_data.get(\"product\", \"\"),\n            \"stages_completed\": input.response_data.get(\"stages_completed\", 0),\n            \"status\": \"shipped\" if passed else \"held for rework\",\n        },\n    )\n",
+    "manifest_yaml": "extension_type: END\nname: Shipping\ndescription: Ships the product if it passed inspection, and returns the traveler.\ntags:\n  - beginner\n  - end\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: text\n    request_data:\n      product:\n        type: string\n        description: What the line made.\n      stages_completed:\n        type: integer\n        description: How many stages finished.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\nexternal_out_port:\n  port_name: external_out\n  port_type: external_out\n  artifact_type_input: text\n  response_data:\n    product:\n      type: string\n      description: What the line made.\n    stages_completed:\n      type: integer\n      description: How many stages finished.\n    status:\n      type: string\n      description: shipped, or held for rework.\ninput_parameters: []\nrequired_secrets: []\n",
+    "ports": [
+      {
+        "direction": "OUT",
+        "key": "external_out",
+        "label": null,
+        "port_type": "external_out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "product": {
+            "type": "string",
+            "description": "What the line made."
+          },
+          "stages_completed": {
+            "type": "integer",
+            "description": "How many stages finished."
+          },
+          "status": {
+            "type": "string",
+            "description": "shipped, or held for rework."
+          }
+        },
+        "artifact_type_input": "text",
+        "artifact_type_output": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": null,
+        "port_type": "in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "product": {
+            "type": "string",
+            "description": "What the line made."
+          },
+          "stages_completed": {
+            "type": "integer",
+            "description": "How many stages finished."
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether the product passed inspection."
+          }
+        },
+        "response_data_schema": null,
+        "artifact_type_input": "text",
+        "artifact_type_output": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

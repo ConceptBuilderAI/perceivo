@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://perceivo.ai/docs
+    about: Read the Perceivo documentation before filing an issue.
+  - name: Security vulnerability
+    url: https://github.com/ConceptBuilderAI/perceivo/security/policy
+    about: Please report security issues privately — do not open a public issue.

@@ -1,0 +1,214 @@
+{
+  "models": {
+    "ReviewRequestRead": {
+      "fields": {
+        "artifacts": {
+          "annotation": "list[dict]|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "assignee_group_id": {
+          "annotation": "UUID|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "assignee_name": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "assignee_user_sub": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "assignment_type": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "capability_id": {
+          "annotation": "UUID|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "completed_at": {
+          "annotation": "datetime|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "component_id": {
+          "annotation": "UUID|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "context_data": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "created_at": {
+          "annotation": "datetime",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "created_by_user_sub": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "draft_data": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "draft_saved_at": {
+          "annotation": "datetime|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "draft_saved_by_user_sub": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "expires_at": {
+          "annotation": "datetime|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "id": {
+          "annotation": "UUID",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "invalidated_by_user_sub": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "invalidation_reason": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "is_blocking": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": true
+          }
+        },
+        "orch_node_id": {
+          "annotation": "UUID|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "orchestration_id": {
+          "annotation": "UUID|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "organization_id": {
+          "annotation": "UUID",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "response_data": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "review_type": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": "USER_DEFINED"
+          }
+        },
+        "reviewer_name": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "reviewer_user_sub": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "run_id": {
+          "annotation": "UUID|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "started_at": {
+          "annotation": "datetime|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "status": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "survey_spec": {
+          "annotation": "list[dict]",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "timeout_minutes": {
+          "annotation": "int|None",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "workload_id": {
+          "annotation": "UUID",
+          "default": {
+            "kind": "required"
+          }
+        }
+      }
+    }
+  },
+  "repository": "platform data service",
+  "root_model": "ReviewRequestRead"
+}

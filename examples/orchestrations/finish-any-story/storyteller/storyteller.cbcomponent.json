@@ -1,0 +1,141 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:55:31.873760Z",
+  "component": {
+    "asset_id": null,
+    "name": "Storyteller",
+    "category": "AGENT",
+    "description": "Reads the story artifact, writes an ending with Claude, and returns the finished story.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "agent",
+      "anthropic"
+    ],
+    "config": {
+      "required_secrets": [
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "label": "Anthropic API key",
+          "description": "Your Anthropic API key. The agent reads it at run time; it is never stored in the component.",
+          "required": true
+        }
+      ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import httpx\nimport perceivo\nfrom perceivo.log.conversation import ContentPart, ConversationMessage\nfrom perceivo.primitives import AgentInput, AgentOutput, Artifact, ArtifactType\n\nANTHROPIC_URL = \"https://api.anthropic.com/v1/messages\"\nMODEL = \"claude-haiku-4-5-20251001\"\nSYSTEM_PROMPT = (\n    \"You finish stories. Continue the story you are given in the same voice \"\n    \"and bring it to a satisfying ending in under 200 words. \"\n    \"Reply with the continuation only.\"\n)\n\n\nasync def ask_claude(api_key: str, story_so_far: str) -> dict:\n    \"\"\"Ask Claude to continue the story and return its text with token counts.\"\"\"\n    async with httpx.AsyncClient(timeout=60) as client:\n        response = await client.post(\n            ANTHROPIC_URL,\n            headers={\"x-api-key\": api_key, \"anthropic-version\": \"2023-06-01\"},\n            json={\n                \"model\": MODEL,\n                \"max_tokens\": 600,\n                \"system\": SYSTEM_PROMPT,\n                \"messages\": [{\"role\": \"user\", \"content\": story_so_far}],\n            },\n        )\n        response.raise_for_status()\n        body = response.json()\n\n    return {\n        \"ending\": body[\"content\"][0][\"text\"].strip(),\n        \"model\": body[\"model\"],\n        \"tokens_in\": body[\"usage\"][\"input_tokens\"],\n        \"tokens_out\": body[\"usage\"][\"output_tokens\"],\n    }\n\n\n@perceivo.agent\nasync def storyteller(input: AgentInput) -> AgentOutput:\n    \"\"\"Finish the story carried in the artifact.\"\"\"\n    # The story is the artifact; the word count is request data.\n    story_so_far = input.artifact.data\n    words_in_opening = input.request_data.get(\"words_in_opening\", 0)\n\n    api_key = await perceivo.secrets.get(\"ANTHROPIC_API_KEY\")\n    result = await ask_claude(api_key, story_so_far)\n    finished = f\"{story_so_far}\\n\\n{result['ending']}\"\n\n    perceivo.log.info(\"Story finished\", words_added=len(result[\"ending\"].split()))\n\n    return AgentOutput(\n        # A new artifact: the finished story. Because it changed, the platform snapshots it.\n        artifact=Artifact(type=ArtifactType.TEXT, data=finished),\n        response_data={\n            \"words_in_opening\": words_in_opening,\n            \"words_added\": len(result[\"ending\"].split()),\n            \"model\": result[\"model\"],\n            \"provider\": \"anthropic\",\n            \"tokens_in\": result[\"tokens_in\"],\n            \"tokens_out\": result[\"tokens_out\"],\n        },\n        conversation_log=ConversationMessage(\n            role=\"agent\",\n            parts=[\n                ContentPart(\"text/plain\", \"Wrote an ending for the story.\", name=\"summary\"),\n                ContentPart(\"text/plain\", result[\"ending\"], name=\"response\"),\n            ],\n            metadata={\n                \"model\": result[\"model\"],\n                \"tokens_in\": result[\"tokens_in\"],\n                \"tokens_out\": result[\"tokens_out\"],\n            },\n        ),\n    )\n",
+    "manifest_yaml": "extension_type: AGENT\nname: Storyteller\ndescription: Reads the story artifact, writes an ending with Claude, and returns the finished story.\ntags:\n  - beginner\n  - agent\n  - anthropic\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The story arrives as the artifact, and the finished story leaves as one.\n    artifact_type_input: text\n    artifact_type_output: text\n    request_data:\n      words_in_opening:\n        type: integer\n        description: How many words the opening has.\n    response_data:\n      words_in_opening:\n        type: integer\n        description: How many words the opening had.\n      words_added:\n        type: integer\n        description: How many words the ending added.\n      model:\n        type: string\n        description: The model that wrote the ending.\n      provider:\n        type: string\n        description: The model provider (anthropic).\n      tokens_in:\n        type: integer\n        description: Prompt tokens the call used.\n      tokens_out:\n        type: integer\n        description: Completion tokens the call used.\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: text\n  artifact_type_output: text\n  response_data:\n    words_in_opening:\n      type: integer\n      description: How many words the opening had.\n    words_added:\n      type: integer\n      description: How many words the ending added.\n    model:\n      type: string\n      description: The model that wrote the ending.\n    provider:\n      type: string\n      description: The model provider (anthropic).\n    tokens_in:\n      type: integer\n      description: Prompt tokens the call used.\n    tokens_out:\n      type: integer\n      description: Completion tokens the call used.\ninput_parameters: []\nrequired_secrets:\n  - name: ANTHROPIC_API_KEY\n    label: Anthropic API key\n    description: Your Anthropic API key. The agent reads it at run time; it is never stored in the component.\n    required: true\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": null,
+        "port_type": "in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "words_in_opening": {
+            "type": "integer",
+            "description": "How many words the opening has."
+          }
+        },
+        "response_data_schema": {
+          "words_in_opening": {
+            "type": "integer",
+            "description": "How many words the opening had."
+          },
+          "words_added": {
+            "type": "integer",
+            "description": "How many words the ending added."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that wrote the ending."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The model provider (anthropic)."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "description": "Prompt tokens the call used."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "description": "Completion tokens the call used."
+          }
+        },
+        "artifact_type_input": "text",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "OUT",
+        "key": "output",
+        "label": null,
+        "port_type": "out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "words_in_opening": {
+            "type": "integer",
+            "description": "How many words the opening had."
+          },
+          "words_added": {
+            "type": "integer",
+            "description": "How many words the ending added."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that wrote the ending."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The model provider (anthropic)."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "description": "Prompt tokens the call used."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "description": "Completion tokens the call used."
+          }
+        },
+        "artifact_type_input": "text",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

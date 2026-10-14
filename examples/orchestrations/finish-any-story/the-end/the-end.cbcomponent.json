@@ -1,0 +1,114 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:55:35.022534Z",
+  "component": {
+    "asset_id": null,
+    "name": "The End",
+    "category": "END",
+    "description": "Returns the finished story as the artifact and a short summary as response data.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "end"
+    ],
+    "config": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\nfrom perceivo.primitives import EndInput, EndOutput\n\n\n@perceivo.end\nasync def the_end(input: EndInput) -> EndOutput:\n    \"\"\"Return the finished story and a summary of what changed.\"\"\"\n    words_in_opening = input.response_data.get(\"words_in_opening\", 0)\n    words_added = input.response_data.get(\"words_added\", 0)\n\n    return EndOutput(\n        # The finished story goes back to the caller as the artifact.\n        artifact=input.artifact,\n        response_data={\n            \"total_words\": words_in_opening + words_added,\n            \"words_added\": words_added,\n            \"model\": input.response_data.get(\"model\", \"\"),\n        },\n    )\n",
+    "manifest_yaml": "extension_type: END\nname: The End\ndescription: Returns the finished story as the artifact and a short summary as response data.\ntags:\n  - beginner\n  - end\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: text\n    request_data:\n      words_in_opening:\n        type: integer\n        description: How many words the opening had.\n      words_added:\n        type: integer\n        description: How many words the ending added.\n      model:\n        type: string\n        description: The model that wrote the ending.\n      provider:\n        type: string\n        description: The model provider.\n      tokens_in:\n        type: integer\n        description: Prompt tokens the call used.\n      tokens_out:\n        type: integer\n        description: Completion tokens the call used.\nexternal_out_port:\n  port_name: external_out\n  port_type: external_out\n  artifact_type_input: text\n  response_data:\n    total_words:\n      type: integer\n      description: Words in the finished story.\n    words_added:\n      type: integer\n      description: How many words the ending added.\n    model:\n      type: string\n      description: The model that wrote the ending.\ninput_parameters: []\nrequired_secrets: []\n",
+    "ports": [
+      {
+        "direction": "OUT",
+        "key": "external_out",
+        "label": null,
+        "port_type": "external_out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "total_words": {
+            "type": "integer",
+            "description": "Words in the finished story."
+          },
+          "words_added": {
+            "type": "integer",
+            "description": "How many words the ending added."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that wrote the ending."
+          }
+        },
+        "artifact_type_input": "text",
+        "artifact_type_output": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": null,
+        "port_type": "in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "words_in_opening": {
+            "type": "integer",
+            "description": "How many words the opening had."
+          },
+          "words_added": {
+            "type": "integer",
+            "description": "How many words the ending added."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that wrote the ending."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The model provider."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "description": "Prompt tokens the call used."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "description": "Completion tokens the call used."
+          }
+        },
+        "response_data_schema": null,
+        "artifact_type_input": "text",
+        "artifact_type_output": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

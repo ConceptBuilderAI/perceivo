@@ -1,0 +1,83 @@
+{
+  "component": {
+    "additional_packages": null,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "asset_id": null,
+    "category": "ADAPTER",
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "arrow-left-right"
+      },
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "request_mappings",
+            "type": "text_long",
+            "label": "Request Mappings",
+            "default": "[]",
+            "description": "JSON array of mappings. Each entry is {\"source_field\", \"target_field\", \"transform\", \"cast_to\", \"value\"} where transform is one of direct, rename, type_cast, extract, constant and cast_to is one of string, integer, float, boolean. An empty array forwards request_data unchanged.\n"
+          }
+        ],
+        "values": {
+          "request_mappings": "[]"
+        }
+      },
+      "is_data_adapter": true,
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      }
+    },
+    "description": "What it does Sits between two components that do not agree on field names and translates one to the other. If the component upstream calls it customer_id and the one downstream expects id, this renames it in passing. No code, no redeploy.\n\nHow it works Reads the data travelling through it and applies a mapping table you supply. Each rule can copy or rename a field, change its type, pull a value out of a nested object, or inject a constant, and the result - exactly the fields the rules name, in order - replaces the data for the next component. With no table configured it forwards everything untouched, so it is safe to drop into a flow before you have configured it. A table that is not valid JSON, or a rule that is incomplete, fails the run with a message naming the rule; so does a value that cannot be cast, such as \"abc\" to integer. A source field that did not arrive is left out and logged.\n\nConfigure\n- Request Mappings - the mapping table, written as JSON. Empty by default. Each entry has a target_field and a transform:\n- direct or rename - copy source_field to target_field.\n- type_cast - copy source_field, cast to cast_to: string, integer, float or boolean.\n- extract - copy a nested value, with source_field a dotted path such as customer.address.city; null when the path is missing.\n- constant - set target_field to value on every run.\nAny entry may add cast_to.\n\nIn and out In: whatever the previous component sent. Out: the fields your mapping produces, or the same data when no mapping is configured. Any artifact is passed on untouched.\n\nUse it when\n- Two components you did not write need to talk to each other.\n- Every request needs a constant injected, such as a tenant id or a model name.\n- A downstream component needs a flat field that currently sits nested inside an object.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: adapter\nname: Data Adapter\ndescription: >\n  Reshapes request_data between two components that disagree on field names.\n  A configured mapping table renames, casts, extracts nested values, or injects\n  constants. With no table configured it forwards what it received unchanged.\n  A malformed table, or a value that cannot be cast, raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The artifact is forwarded straight into the Output constructor and is\n    # never dereferenced, so it is welcome but never required -- optional(json)\n    # is the only declaration that is true of this script.\n    artifact_type_input: optional(json)\n    artifact_type_output: optional(json)\n    # Not `response_data_passthrough`: passthrough is true only while no\n    # mapping table is configured, and becomes a false promise the moment one\n    # is. The key set is configuration-determined in both branches.\n    response_data_contract: dynamic\n    response_data_contract_reason: >\n      response_data keys are the `target_field` values of the mapping table\n      configured in the `request_mappings` node parameter. When that parameter\n      is empty the adapter forwards the inbound request_data key set unchanged.\n      Either way the key set is fixed by node configuration, not by this script,\n      so it cannot be enumerated statically.\n\ninput_parameters:\n  - name: request_mappings\n    type: text_long\n    label: Request Mappings\n    default: \"[]\"\n    description: >\n      JSON array of mappings. Each entry is\n      {\"source_field\", \"target_field\", \"transform\", \"cast_to\", \"value\"} where\n      transform is one of direct, rename, type_cast, extract, constant and\n      cast_to is one of string, integer, float, boolean.\n      An empty array forwards request_data unchanged.\n",
+    "name": "DATA ADAPTER (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "optional(json)",
+        "artifact_types": [
+          "none"
+        ],
+        "base_schema": null,
+        "contract": {},
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "multi_artifact": false,
+        "port_type": "in",
+        "post_tool_contract": null,
+        "request_data_schema": null,
+        "response_data_contract": "dynamic",
+        "response_data_contract_reason": "response_data keys are the `target_field` values of the mapping table configured in the `request_mappings` node parameter. When that parameter is empty the adapter forwards the inbound request_data key set unchanged. Either way the key set is fixed by node configuration, not by this script, so it cannot be enumerated statically.",
+        "response_data_passthrough_except": null,
+        "response_data_schema": null,
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "\"\"\"Data Adapter: translate request_data between two components by a mapping table.\n\nThe table is node configuration, so the outgoing key set is decided per node,\nnot by this script. With no table the inbound data is forwarded unchanged,\nwhich keeps an unconfigured node harmless. A malformed table raises ValueError\nnaming the bad entry, and a value that cannot be cast raises naming the field:\nthe adapter never forwards data it silently got wrong.\n\"\"\"\n\nimport json\n\nimport perceivo\n\n_TRANSFORMS = (\"direct\", \"rename\", \"type_cast\", \"extract\", \"constant\")\n# The platform's scalar property types. \"number\" is deliberately absent: it was\n# removed as a property type platform-wide.\n_CASTS = (\"string\", \"integer\", \"float\", \"boolean\")\n_TRUE = (\"true\", \"1\", \"yes\", \"y\", \"on\")\n_FALSE = (\"false\", \"0\", \"no\", \"n\", \"off\", \"\")\n_ABSENT = object()\n\n\ndef _cast(value, cast_to: str, where: str):\n    \"\"\"Coerce a value to one of the scalar property types; null stays null.\"\"\"\n    if value is None:\n        return None\n    if cast_to == \"string\":\n        if isinstance(value, bool):\n            return \"true\" if value else \"false\"\n        if isinstance(value, (dict, list)):\n            return json.dumps(value)\n        return str(value)\n    if cast_to == \"boolean\":\n        if isinstance(value, bool):\n            return value\n        text = str(value).strip().lower()\n        if text not in _TRUE and text not in _FALSE:\n            raise ValueError(\n                f\"{where}: {value!r} is not a boolean (true/false, yes/no, 1/0, on/off).\"\n            )\n        return text in _TRUE\n    if isinstance(value, (bool, dict, list)):\n        raise ValueError(f\"{where}: {value!r} cannot be cast to {cast_to}.\")\n    if cast_to == \"integer\" and isinstance(value, int):\n        return value\n    text = str(value).strip()\n    if cast_to == \"integer\":\n        try:\n            return int(text)  # exact, however many digits\n        except ValueError:\n            pass\n    try:\n        number = float(text)\n    except ValueError:\n        raise ValueError(f\"{where}: {value!r} is not a number.\") from None\n    if cast_to == \"float\":\n        return number\n    if not number.is_integer():\n        raise ValueError(f\"{where}: {value!r} is not a whole number.\")\n    return int(number)\n\n\ndef _extract(data, dotted_path: str):\n    \"\"\"Resolve a dotted path against nested dicts; null when any step is missing.\"\"\"\n    current = data\n    for part in dotted_path.split(\".\"):\n        if not isinstance(current, dict):\n            return None\n        current = current.get(part)\n    return current\n\n\ndef _load_mappings(raw) -> list:\n    \"\"\"Parse and check the mapping table, or raise naming what is wrong with it.\"\"\"\n    if raw is None or (isinstance(raw, str) and not raw.strip()):\n        return []\n    if isinstance(raw, str):\n        try:\n            raw = json.loads(raw)\n        except json.JSONDecodeError as exc:\n            raise ValueError(\n                f\"Request Mappings is not valid JSON: {exc.msg} (line {exc.lineno}).\"\n            ) from None\n    if not isinstance(raw, list):\n        raise ValueError(\"Request Mappings must be a JSON array of mapping objects.\")\n\n    mappings = []\n    for number, entry in enumerate(raw, start=1):\n        where = f\"Request Mappings entry {number}\"\n        if not isinstance(entry, dict):\n            raise ValueError(f\"{where} is not an object.\")\n        target = str(entry.get(\"target_field\") or \"\").strip()\n        if not target:\n            raise ValueError(f\"{where} has no target_field.\")\n        transform = str(entry.get(\"transform\") or \"direct\").strip().lower()\n        if transform not in _TRANSFORMS:\n            raise ValueError(\n                f\"{where}: transform is {transform!r}. Choose one of: {', '.join(_TRANSFORMS)}.\"\n            )\n        source = str(entry.get(\"source_field\") or \"\").strip()\n        if transform != \"constant\" and not source:\n            raise ValueError(f\"{where}: the {transform} transform needs a source_field.\")\n        if transform == \"constant\" and \"value\" not in entry:\n            raise ValueError(f\"{where}: the constant transform needs a value.\")\n        cast_to = str(entry.get(\"cast_to\") or \"\").strip().lower()\n        if transform == \"type_cast\" and not cast_to:\n            raise ValueError(f\"{where}: the type_cast transform needs cast_to.\")\n        if cast_to and cast_to not in _CASTS:\n            raise ValueError(\n                f\"{where}: cast_to is {cast_to!r}. Choose one of: {', '.join(_CASTS)}.\"\n            )\n        mappings.append(\n            {\n                \"where\": f\"{where} ({target})\",\n                \"target\": target,\n                \"transform\": transform,\n                \"source\": source,\n                \"cast_to\": cast_to,\n                \"value\": entry.get(\"value\"),\n            }\n        )\n    return mappings\n\n\ndef _resolve(data: dict, mapping: dict):\n    \"\"\"One mapping's value, or _ABSENT when its source field did not arrive.\n\n    An extract whose nested path misses is null, a real value the target\n    carries; a direct, rename or type_cast whose source did not arrive\n    contributes nothing.\n    \"\"\"\n    transform, source = mapping[\"transform\"], mapping[\"source\"]\n    if transform == \"constant\":\n        value = mapping[\"value\"]\n    elif transform == \"extract\":\n        value = _extract(data, source)\n    elif source in data:\n        value = data[source]\n    else:\n        return _ABSENT\n    if mapping[\"cast_to\"]:\n        value = _cast(value, mapping[\"cast_to\"], mapping[\"where\"])\n    return value\n\n\n@perceivo.adapter\nasync def data_adapter(\n    input: perceivo.primitives.AdapterInput,\n) -> perceivo.primitives.AdapterOutput:\n    \"\"\"Reshape request_data with the configured mapping table.\n\n    The output holds exactly the table's target fields, in table order (a later\n    entry for the same target wins). With no table the inbound data is\n    forwarded unchanged. The artifact is forwarded untouched and never\n    dereferenced, so it is welcome but never required.\n    \"\"\"\n    incoming = input.request_data or {}\n    if not isinstance(incoming, dict):\n        incoming = {\"data\": incoming}\n\n    mappings = _load_mappings(perceivo.params.get(\"request_mappings\", \"[]\"))\n    if not mappings:\n        perceivo.log.info(\n            f\"Data Adapter: no mappings configured; forwarding {len(incoming)} field(s) unchanged.\"\n        )\n        return perceivo.primitives.AdapterOutput(\n            artifact=input.artifact, response_data=dict(incoming)\n        )\n\n    outgoing, missing = {}, []\n    for mapping in mappings:\n        value = _resolve(incoming, mapping)\n        if value is _ABSENT:\n            missing.append(mapping[\"source\"])\n        else:\n            outgoing[mapping[\"target\"]] = value\n    if missing:\n        perceivo.log.warning(\n            f\"Data Adapter: {len(missing)} source field(s) did not arrive and were left out.\",\n            missing=missing,\n        )\n    perceivo.log.info(\n        f\"Data Adapter: mapped {len(incoming)} inbound field(s) to {len(outgoing)} outbound \"\n        f\"field(s) via {len(mappings)} mapping(s).\"\n    )\n    return perceivo.primitives.AdapterOutput(artifact=input.artifact, response_data=outgoing)\n",
+    "short_description": "Translates field names and types between two components that disagree, with a mapping table and no code.",
+    "tags": [
+      "template",
+      "adapter",
+      "mapping",
+      "transformation"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-10-06T00:00:00Z"
+}

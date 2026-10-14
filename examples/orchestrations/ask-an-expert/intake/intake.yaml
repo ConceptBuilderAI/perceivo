@@ -1,0 +1,33 @@
+extension_type: START
+name: Intake
+description: Takes a profession and a question and hands both to the expert.
+tags:
+  - beginner
+  - start
+external_in_port:
+  port_name: external_in
+  port_type: external_in
+  artifact_type_input: json
+  artifact_type_output: text
+  request_data:
+    profession:
+      type: string
+      description: Who should answer, for example "structural engineer".
+    question:
+      type: string
+      description: The question to ask that expert.
+output_ports:
+  - port_name: output
+    port_type: out
+    artifact_type_input: json
+    artifact_type_output: text
+    response_data:
+      profession:
+        type: string
+        description: The profession, forwarded unchanged.
+      question:
+        type: string
+        description: The question, forwarded unchanged.
+input_parameters: []
+input_prompt: Name a profession and ask that expert a question.
+required_secrets: []

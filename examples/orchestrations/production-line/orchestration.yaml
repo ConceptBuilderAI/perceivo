@@ -1,0 +1,192 @@
+name: Production Line
+description: A line supervisor agent starts four tool stages - Cut, Weld, Paint, Inspection - each of which calls the next.
+nodes:
+- id: node_work_order
+  name: Work Order
+  component_type: START
+  script: work-order/work-order.py
+  manifest: work-order/work-order.yaml
+  position:
+    x: 50
+    y: 236
+- id: node_line_supervisor
+  name: Line Supervisor
+  component_type: AGENT
+  script: line-supervisor/line-supervisor.py
+  manifest: line-supervisor/line-supervisor.yaml
+  position:
+    x: 326
+    y: 220
+  config:
+    port_sides:
+      first_stage: bottom
+- id: node_cut
+  name: Cut
+  component_type: TOOL
+  script: cut/cut.py
+  manifest: cut/cut.yaml
+  position:
+    x: 335
+    y: 430
+  config:
+    port_sides:
+      input: top
+    appearance:
+      icon: zap
+      shape: diamond
+      size: sm
+      color: red
+- id: node_weld
+  name: Weld
+  component_type: TOOL
+  script: weld/weld.py
+  manifest: weld/weld.yaml
+  position:
+    x: 545
+    y: 600
+  config:
+    port_sides:
+      input: left
+    appearance:
+      icon: settings
+      shape: hexagon
+      size: md
+      color: orange
+- id: node_paint
+  name: Paint
+  component_type: TOOL
+  script: paint/paint.py
+  manifest: paint/paint.yaml
+  position:
+    x: 755
+    y: 770
+  config:
+    port_sides:
+      input: left
+    appearance:
+      icon: layers
+      shape: circle
+      size: md
+      color: violet
+- id: node_inspection
+  name: Inspection
+  component_type: TOOL
+  script: inspection/inspection.py
+  manifest: inspection/inspection.yaml
+  position:
+    x: 965
+    y: 940
+  config:
+    port_sides:
+      input: left
+    appearance:
+      icon: search
+      shape: document
+      size: lg
+      color: green
+- id: node_shipping
+  name: Shipping
+  component_type: END
+  script: shipping/shipping.py
+  manifest: shipping/shipping.yaml
+  position:
+    x: 570
+    y: 236
+ports:
+- id: port_work_order_external_in
+  node_id: node_work_order
+  name: external_in
+  port_type: external_in
+  direction: IN
+- id: port_work_order_output
+  node_id: node_work_order
+  name: output
+  port_type: out
+  base_schema: StartOut
+  direction: OUT
+- id: port_line_supervisor_input
+  node_id: node_line_supervisor
+  name: input
+  port_type: in
+  base_schema: AgentIn
+  direction: IN
+- id: port_line_supervisor_output
+  node_id: node_line_supervisor
+  name: output
+  port_type: out
+  base_schema: AgentOut
+  direction: OUT
+- id: port_line_supervisor_first_stage
+  node_id: node_line_supervisor
+  name: first_stage
+  port_type: tool
+  direction: OUT
+- id: port_cut_input
+  node_id: node_cut
+  name: input
+  port_type: in
+  base_schema: ToolIn
+  direction: IN
+- id: port_cut_next_stage
+  node_id: node_cut
+  name: next_stage
+  port_type: tool
+  direction: OUT
+- id: port_weld_input
+  node_id: node_weld
+  name: input
+  port_type: in
+  base_schema: ToolIn
+  direction: IN
+- id: port_weld_next_stage
+  node_id: node_weld
+  name: next_stage
+  port_type: tool
+  direction: OUT
+- id: port_paint_input
+  node_id: node_paint
+  name: input
+  port_type: in
+  base_schema: ToolIn
+  direction: IN
+- id: port_paint_next_stage
+  node_id: node_paint
+  name: next_stage
+  port_type: tool
+  direction: OUT
+- id: port_inspection_input
+  node_id: node_inspection
+  name: input
+  port_type: in
+  base_schema: ToolIn
+  direction: IN
+- id: port_shipping_input
+  node_id: node_shipping
+  name: input
+  port_type: in
+  base_schema: EndIn
+  direction: IN
+- id: port_shipping_external_out
+  node_id: node_shipping
+  name: external_out
+  port_type: external_out
+  direction: OUT
+edges:
+- source_port_id: port_work_order_output
+  target_port_id: port_line_supervisor_input
+  kind: MAINFLOW
+- source_port_id: port_line_supervisor_output
+  target_port_id: port_shipping_input
+  kind: MAINFLOW
+- source_port_id: port_line_supervisor_first_stage
+  target_port_id: port_cut_input
+  kind: INVOKE
+- source_port_id: port_cut_next_stage
+  target_port_id: port_weld_input
+  kind: INVOKE
+- source_port_id: port_weld_next_stage
+  target_port_id: port_paint_input
+  kind: INVOKE
+- source_port_id: port_paint_next_stage
+  target_port_id: port_inspection_input
+  kind: INVOKE

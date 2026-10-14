@@ -1,0 +1,225 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "REDIS CACHE (SYSTEM, READ-ONLY)",
+    "category": "AGENT",
+    "description": "What it does Reads and writes keys in your organization's Redis cache - a fast place to keep session state, counters, lookups and results you do not want to compute twice.\n\nHow it works Each node runs one operation, chosen in the Inspector. Anything in ${braces} in the key, field, value or pattern is filled in from the data arriving at the node, so a key of \"user:${user_id}\" reaches the right user. A placeholder naming a field that is not there stops the run rather than writing to the wrong key, and a Redis error fails the run - a write is never reported as done when it was not.\n\nConfigure\n- Operation - GET, SET, DELETE, HGET, HSET, HGETALL, EXISTS, KEYS or SCAN_VALUES.\n- Key Prefix - an optional namespace put in front of every key and pattern.\n- Key - the key to act on.\n- Hash Field - the field within a hash, for HGET and HSET.\n- Value - what to store, for SET and HSET; objects and lists are stored as JSON.\n- TTL (seconds) - how long a written key lives; 0 keeps it forever.\n- Key Pattern - which keys KEYS and SCAN_VALUES list, such as session:*.\n\nIn and out In: any data; its fields fill the placeholders. Out: a JSON result with the operation and the full key, plus value, fields, exists, deleted, keys or entries depending on the operation.\n\nUse it when\n- You want to cache a slow lookup or model answer between runs.\n- Several orchestrations need to share a small piece of state.\n- You want to see what is stored under a prefix while building or debugging.",
+    "short_description": "Reads and writes keys in your organization's Redis cache, filling ${field} placeholders from incoming data.",
+    "tags": [
+      "template",
+      "cache",
+      "redis"
+    ],
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "database"
+      },
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "input_parameters": {
+        "values": {
+          "operation": "GET",
+          "key_prefix": "",
+          "key": "${key}",
+          "field": "",
+          "value": "${value}",
+          "default_ttl_seconds": 0,
+          "pattern": "*"
+        },
+        "declarations": [
+          {
+            "name": "operation",
+            "type": "select",
+            "label": "Operation",
+            "options": [
+              "GET",
+              "SET",
+              "DELETE",
+              "HGET",
+              "HSET",
+              "HGETALL",
+              "EXISTS",
+              "KEYS",
+              "SCAN_VALUES"
+            ],
+            "default": "GET",
+            "required": true,
+            "description": "The Redis operation this node runs."
+          },
+          {
+            "name": "key_prefix",
+            "type": "text",
+            "label": "Key Prefix",
+            "default": "",
+            "description": "Optional namespace put in front of every key and pattern (myapp makes myapp:key). Accepts ${field} placeholders."
+          },
+          {
+            "name": "key",
+            "type": "text",
+            "label": "Key",
+            "default": "${key}",
+            "required": true,
+            "description": "The key to act on. Accepts ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "GET",
+                "SET",
+                "DELETE",
+                "HGET",
+                "HSET",
+                "HGETALL",
+                "EXISTS"
+              ]
+            }
+          },
+          {
+            "name": "field",
+            "type": "text",
+            "label": "Hash Field",
+            "default": "",
+            "description": "The field within the hash. Accepts ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "HGET",
+                "HSET"
+              ]
+            }
+          },
+          {
+            "name": "value",
+            "type": "text_long",
+            "label": "Value",
+            "default": "${value}",
+            "description": "The value to store. A placeholder that names an object or list stores it as JSON.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SET",
+                "HSET"
+              ]
+            }
+          },
+          {
+            "name": "default_ttl_seconds",
+            "type": "integer",
+            "label": "TTL (seconds)",
+            "default": 0,
+            "constraints": {
+              "min": 0,
+              "max": 2592000
+            },
+            "description": "Seconds until the key expires; 0 keeps it forever. HSET applies it to the whole hash.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SET",
+                "HSET"
+              ]
+            }
+          },
+          {
+            "name": "pattern",
+            "type": "text",
+            "label": "Key Pattern",
+            "default": "*",
+            "description": "Glob pattern for KEYS and SCAN_VALUES (user:*, session:*). Accepts ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "KEYS",
+                "SCAN_VALUES"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "none",
+    "artifact_type_output": "json",
+    "script": "\"\"\"Redis Cache -- read and write keys in the organization's in-cluster Redis.\n\nOne node runs one operation, chosen in the Inspector: GET, SET, DELETE, HGET,\nHSET, HGETALL, EXISTS, KEYS or SCAN_VALUES. Key, field, value and pattern may\ncontain ${field} placeholders, filled from the incoming request_data (dotted\npaths such as ${user.id} reach into nested objects).\n\nA misconfigured node raises ValueError before Redis is touched, and a Redis\nfailure raises from the client. Neither is caught: a write that did not happen\nmust fail the run, never be reported as done.\n\"\"\"\n\nimport json\nimport re\n\nimport perceivo\n\n_OPERATIONS = (\"GET\", \"SET\", \"DELETE\", \"HGET\", \"HSET\", \"HGETALL\", \"EXISTS\", \"KEYS\", \"SCAN_VALUES\")\n_KEYED = (\"GET\", \"SET\", \"DELETE\", \"HGET\", \"HSET\", \"HGETALL\", \"EXISTS\")\n_HASH_FIELD = (\"HGET\", \"HSET\")\n\n# SCAN_VALUES reads at most this many keys, and at most this many items of\n# each list, so a large keyspace cannot exhaust the run's memory.\n_MAX_SCAN_KEYS = 200\n_MAX_LIST_ITEMS = 100\n\n_PLACEHOLDER = re.compile(r\"\\$\\{([\\w.]+)\\}\")\n\n\ndef _lookup(data, path: str):\n    \"\"\"Return (True, value) for a dotted path into data, or (False, None).\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if isinstance(value, dict) and part in value:\n            value = value[part]\n        elif isinstance(value, list) and part.isdigit() and int(part) < len(value):\n            value = value[int(part)]\n        else:\n            return False, None\n    return True, value\n\n\ndef _fill(label: str, template: str, data: dict) -> str:\n    \"\"\"Replace each ${path} in template with that value from data.\n\n    Strings are inserted as they are; anything else (numbers, objects, lists)\n    as JSON. A placeholder naming a field the data does not carry raises, so a\n    missing input never turns into a write to the wrong key.\n    \"\"\"\n\n    def _replace(match):\n        found, value = _lookup(data, match.group(1))\n        if not found:\n            raise ValueError(\n                f\"{label} refers to ${{{match.group(1)}}}, but the incoming data has no such field.\"\n            )\n        return value if isinstance(value, str) else json.dumps(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    value = perceivo.params.get(name, default)\n    return default if value is None else str(value)\n\n\ndef _ttl_seconds() -> int:\n    \"\"\"The TTL in whole seconds; 0 means the key never expires.\"\"\"\n    raw = perceivo.params.get(\"default_ttl_seconds\", 0)\n    try:\n        ttl = int(raw or 0)\n    except (TypeError, ValueError):\n        raise ValueError(f\"TTL is {raw!r}. Use a whole number of seconds, or 0 for no expiry.\") from None\n    if ttl < 0:\n        raise ValueError(f\"TTL is {ttl}. Use a whole number of seconds, or 0 for no expiry.\")\n    return ttl\n\n\ndef _decode(value):\n    \"\"\"Turn bytes replies into text.\n\n    The in-cluster client already decodes, but the SDK's local in-memory Redis\n    answers in bytes, so this keeps both runtimes giving the same output.\n    \"\"\"\n    if isinstance(value, bytes):\n        return value.decode(\"utf-8\", errors=\"replace\")\n    if isinstance(value, dict):\n        return {_decode(k): _decode(v) for k, v in value.items()}\n    if isinstance(value, (list, tuple, set)):\n        return [_decode(item) for item in value]\n    return value\n\n\nasync def _read_any(redis, key: str) -> dict:\n    \"\"\"Read one key for SCAN_VALUES, whatever its type.\n\n    The platform's Redis client has no TYPE command, so each reader is tried in\n    turn and Redis's WRONGTYPE reply means \"not this type\". Any other error is\n    a real failure and is raised.\n    \"\"\"\n    readers = (\n        (\"string\", lambda: redis.get(key)),\n        (\"hash\", lambda: redis.hgetall(key)),\n        (\"list\", lambda: redis.lrange(key, 0, _MAX_LIST_ITEMS - 1)),\n    )\n    for kind, read in readers:\n        try:\n            value = _decode(await read())\n        except Exception as exc:\n            if \"WRONGTYPE\" in str(exc):\n                continue\n            raise\n        if (kind == \"string\" and isinstance(value, str)) or (kind != \"string\" and value):\n            return {\"key\": key, \"type\": kind, \"value\": value}\n    return {\"key\": key, \"type\": \"other\", \"value\": None}\n\n\n@perceivo.agent\nasync def redis_cache(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Run one Redis operation and report its result as JSON.\n\n    The result is both the JSON artifact and the response_data: always the\n    operation and the full key it used, plus the operation's own field --\n    value (GET, HGET, SET, HSET), fields (HGETALL), exists (EXISTS), deleted\n    (DELETE), keys (KEYS, SCAN_VALUES) and entries (SCAN_VALUES).\n    \"\"\"\n    data = input.request_data if isinstance(input.request_data, dict) else {}\n\n    operation = _param(\"operation\", \"GET\").strip().upper()\n    if operation not in _OPERATIONS:\n        raise ValueError(f\"Operation is {operation!r}. Choose one of: {', '.join(_OPERATIONS)}.\")\n\n    prefix = _fill(\"Key Prefix\", _param(\"key_prefix\"), data).strip().rstrip(\":\")\n    key = \"\"\n    if operation in _KEYED:\n        raw_key = _fill(\"Key\", _param(\"key\"), data).strip()\n        if not raw_key:\n            raise ValueError(f\"Key is empty. {operation} needs the key to act on.\")\n        key = f\"{prefix}:{raw_key}\" if prefix else raw_key\n\n    field = \"\"\n    if operation in _HASH_FIELD:\n        field = _fill(\"Hash Field\", _param(\"field\"), data).strip()\n        if not field:\n            raise ValueError(f\"Hash Field is empty. {operation} needs the field within the hash.\")\n\n    value = _fill(\"Value\", _param(\"value\"), data) if operation in (\"SET\", \"HSET\") else \"\"\n    ttl = _ttl_seconds() if operation in (\"SET\", \"HSET\") else 0\n\n    pattern = \"\"\n    if operation in (\"KEYS\", \"SCAN_VALUES\"):\n        raw_pattern = _fill(\"Key Pattern\", _param(\"pattern\", \"*\"), data).strip() or \"*\"\n        pattern = f\"{prefix}:{raw_pattern}\" if prefix else raw_pattern\n\n    redis = await perceivo.cluster.redis.connect()\n    perceivo.log.info(f\"Redis Cache: {operation}\", operation=operation, key=key or pattern)\n\n    if operation == \"GET\":\n        result = {\"operation\": operation, \"key\": key, \"value\": _decode(await redis.get(key))}\n    elif operation == \"SET\":\n        await redis.set(key, value, ttl_seconds=ttl or None)\n        result = {\"operation\": operation, \"key\": key, \"value\": value}\n    elif operation == \"DELETE\":\n        result = {\"operation\": operation, \"key\": key, \"deleted\": bool(await redis.delete(key))}\n    elif operation == \"HGET\":\n        result = {\"operation\": operation, \"key\": key, \"value\": _decode(await redis.hget(key, field))}\n    elif operation == \"HSET\":\n        await redis.hset(key, field, value)\n        if ttl:\n            await redis.expire(key, ttl)\n        result = {\"operation\": operation, \"key\": key, \"value\": value}\n    elif operation == \"HGETALL\":\n        result = {\"operation\": operation, \"key\": key, \"fields\": _decode(await redis.hgetall(key))}\n    elif operation == \"EXISTS\":\n        result = {\"operation\": operation, \"key\": key, \"exists\": bool(await redis.exists(key))}\n    elif operation == \"KEYS\":\n        result = {\"operation\": operation, \"key\": pattern, \"keys\": sorted(_decode(await redis.keys(pattern)))}\n    else:\n        matches = sorted(_decode(await redis.keys(pattern)))\n        entries = [await _read_any(redis, k) for k in matches[:_MAX_SCAN_KEYS]]\n        result = {\"operation\": operation, \"key\": pattern, \"keys\": matches, \"entries\": entries}\n\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON, data=result, mime_type=\"application/json\"\n        ),\n        response_data=result,\n    )\n",
+    "manifest_yaml": "extension_type: agent\nname: Redis Cache\ndescription: >\n  Runs one Redis operation (GET, SET, DELETE, HGET, HSET, HGETALL, EXISTS,\n  KEYS or SCAN_VALUES) against the organization's in-cluster Redis.\n  ${field} placeholders in the key, field, value and pattern are filled from\n  request_data. A misconfigured node or a Redis failure raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The incoming artifact is not read. Placeholders read request_data by\n    # whatever name the Inspector names, so no specific inbound key is required.\n    artifact_type_input: none\n    artifact_type_output: json\n    response_data:\n      operation: string - The operation that ran.\n      key: string - The full key acted on, prefix included; the full pattern for KEYS and SCAN_VALUES.\n      value: string (optional) - GET and HGET - the value read, null when missing. SET and HSET - the value written.\n      fields: object (optional) - HGETALL only - every field of the hash; empty when the key is missing.\n      exists: boolean (optional) - EXISTS only - whether the key exists.\n      deleted: boolean (optional) - DELETE only - whether a key was removed.\n      keys: array (optional) - KEYS and SCAN_VALUES - the matching key names, sorted.\n      entries: array (optional) - SCAN_VALUES only - key, type and value of up to 200 matching keys.\n\ninput_parameters:\n  - name: operation\n    type: select\n    label: Operation\n    options: [GET, SET, DELETE, HGET, HSET, HGETALL, EXISTS, KEYS, SCAN_VALUES]\n    default: GET\n    required: true\n    description: The Redis operation this node runs.\n  - name: key_prefix\n    type: text\n    label: Key Prefix\n    default: \"\"\n    description: Optional namespace put in front of every key and pattern (myapp makes myapp:key). Accepts ${field} placeholders.\n  - name: key\n    type: text\n    label: Key\n    default: \"${key}\"\n    required: true\n    description: The key to act on. Accepts ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [GET, SET, DELETE, HGET, HSET, HGETALL, EXISTS]\n  - name: field\n    type: text\n    label: Hash Field\n    default: \"\"\n    description: The field within the hash. Accepts ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [HGET, HSET]\n  - name: value\n    type: text_long\n    label: Value\n    default: \"${value}\"\n    description: The value to store. A placeholder that names an object or list stores it as JSON.\n    depends_on:\n      parameter: operation\n      visible_when: [SET, HSET]\n  - name: default_ttl_seconds\n    type: integer\n    label: TTL (seconds)\n    default: 0\n    constraints:\n      min: 0\n      max: 2592000\n    description: Seconds until the key expires; 0 keeps it forever. HSET applies it to the whole hash.\n    depends_on:\n      parameter: operation\n      visible_when: [SET, HSET]\n  - name: pattern\n    type: text\n    label: Key Pattern\n    default: \"*\"\n    description: Glob pattern for KEYS and SCAN_VALUES (user:*, session:*). Accepts ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [KEYS, SCAN_VALUES]\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "operation": {
+            "type": "string",
+            "required": true,
+            "description": "The operation that ran."
+          },
+          "key": {
+            "type": "string",
+            "required": true,
+            "description": "The full key acted on, prefix included; the full pattern for KEYS and SCAN_VALUES."
+          },
+          "value": {
+            "type": "string",
+            "required": false,
+            "description": "GET and HGET - the value read, null when missing. SET and HSET - the value written."
+          },
+          "fields": {
+            "type": "object",
+            "required": false,
+            "description": "HGETALL only - every field of the hash; empty when the key is missing."
+          },
+          "exists": {
+            "type": "boolean",
+            "required": false,
+            "description": "EXISTS only - whether the key exists."
+          },
+          "deleted": {
+            "type": "boolean",
+            "required": false,
+            "description": "DELETE only - whether a key was removed."
+          },
+          "keys": {
+            "type": "array",
+            "required": false,
+            "description": "KEYS and SCAN_VALUES - the matching key names, sorted."
+          },
+          "entries": {
+            "type": "array",
+            "required": false,
+            "description": "SCAN_VALUES only - key, type and value of up to 200 matching keys."
+          }
+        },
+        "artifact_type_input": "none",
+        "artifact_type_output": "json",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "none"
+        ],
+        "response_data_passthrough_except": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

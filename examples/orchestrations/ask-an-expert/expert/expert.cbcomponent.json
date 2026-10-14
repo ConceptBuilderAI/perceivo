@@ -1,0 +1,137 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:55:15.599969Z",
+  "component": {
+    "asset_id": null,
+    "name": "Expert",
+    "category": "AGENT",
+    "description": "Answers the question in the voice of the requested profession, using ChatGPT.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "agent",
+      "openai"
+    ],
+    "config": {
+      "required_secrets": [
+        {
+          "name": "OPENAI_API_KEY",
+          "label": "OpenAI API key",
+          "description": "Your OpenAI API key. The agent reads it at run time; it is never stored in the component.",
+          "required": true
+        }
+      ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import httpx\nimport perceivo\nfrom perceivo.log.conversation import ContentPart, ConversationMessage\nfrom perceivo.primitives import AgentInput, AgentOutput, Artifact, ArtifactType\n\nOPENAI_URL = \"https://api.openai.com/v1/chat/completions\"\nMODEL = \"gpt-4o-mini\"\n\n\nasync def ask_chatgpt(api_key: str, system_prompt: str, question: str) -> dict:\n    \"\"\"Send one question to ChatGPT and return the reply with its token counts.\"\"\"\n    async with httpx.AsyncClient(timeout=60) as client:\n        response = await client.post(\n            OPENAI_URL,\n            headers={\"Authorization\": f\"Bearer {api_key}\"},\n            json={\n                \"model\": MODEL,\n                \"messages\": [\n                    {\"role\": \"system\", \"content\": system_prompt},\n                    {\"role\": \"user\", \"content\": question},\n                ],\n            },\n        )\n        response.raise_for_status()\n        body = response.json()\n\n    return {\n        \"answer\": body[\"choices\"][0][\"message\"][\"content\"],\n        \"model\": body[\"model\"],\n        \"tokens_in\": body[\"usage\"][\"prompt_tokens\"],\n        \"tokens_out\": body[\"usage\"][\"completion_tokens\"],\n    }\n\n\n@perceivo.agent\nasync def expert(input: AgentInput) -> AgentOutput:\n    \"\"\"Answer the question as the requested professional.\"\"\"\n    # 1. Read the request data the start component sent.\n    profession = input.request_data[\"profession\"]\n    question = input.request_data[\"question\"]\n\n    # 2. Read the secret declared in expert.yaml.\n    api_key = await perceivo.secrets.get(\"OPENAI_API_KEY\")\n\n    # 3. Fill the system prompt from the request data, then call ChatGPT.\n    system_prompt = (\n        f\"You are an experienced {profession}. \"\n        \"Answer the question the way you would explain it to a client: \"\n        \"plainly, accurately and in under 150 words.\"\n    )\n    result = await ask_chatgpt(api_key, system_prompt, question)\n    perceivo.log.info(\"Expert answered\", model=result[\"model\"], tokens_out=result[\"tokens_out\"])\n\n    # 4. Return two things: the reply as response data, and an entry for the conversation log.\n    return AgentOutput(\n        artifact=Artifact(type=ArtifactType.TEXT, data=result[\"answer\"]),\n        response_data={\n            \"answer\": result[\"answer\"],\n            \"model\": result[\"model\"],\n            \"provider\": \"openai\",\n            \"tokens_in\": result[\"tokens_in\"],\n            \"tokens_out\": result[\"tokens_out\"],\n        },\n        conversation_log=ConversationMessage(\n            role=\"agent\",\n            parts=[\n                ContentPart(\"text/plain\", f\"Answered as a {profession}.\", name=\"summary\"),\n                ContentPart(\"text/plain\", result[\"answer\"], name=\"response\"),\n            ],\n            metadata={\n                \"model\": result[\"model\"],\n                \"tokens_in\": result[\"tokens_in\"],\n                \"tokens_out\": result[\"tokens_out\"],\n            },\n        ),\n    )\n",
+    "manifest_yaml": "extension_type: AGENT\nname: Expert\ndescription: Answers the question in the voice of the requested profession, using ChatGPT.\ntags:\n  - beginner\n  - agent\n  - openai\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: text\n    artifact_type_output: text\n    request_data:\n      profession:\n        type: string\n        description: The profession the expert speaks as.\n      question:\n        type: string\n        description: The question to answer.\n    response_data:\n      answer:\n        type: string\n        description: The expert's reply.\n      model:\n        type: string\n        description: The model that wrote the reply.\n      provider:\n        type: string\n        description: The model provider (openai).\n      tokens_in:\n        type: integer\n        description: Prompt tokens the call used.\n      tokens_out:\n        type: integer\n        description: Completion tokens the call used.\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: text\n  artifact_type_output: text\n  response_data:\n    answer:\n      type: string\n      description: The expert's reply.\n    model:\n      type: string\n      description: The model that wrote the reply.\n    provider:\n      type: string\n      description: The model provider (openai).\n    tokens_in:\n      type: integer\n      description: Prompt tokens the call used.\n    tokens_out:\n      type: integer\n      description: Completion tokens the call used.\ninput_parameters: []\nrequired_secrets:\n  - name: OPENAI_API_KEY\n    label: OpenAI API key\n    description: Your OpenAI API key. The agent reads it at run time; it is never stored in the component.\n    required: true\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": null,
+        "port_type": "in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "profession": {
+            "type": "string",
+            "description": "The profession the expert speaks as."
+          },
+          "question": {
+            "type": "string",
+            "description": "The question to answer."
+          }
+        },
+        "response_data_schema": {
+          "answer": {
+            "type": "string",
+            "description": "The expert's reply."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that wrote the reply."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The model provider (openai)."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "description": "Prompt tokens the call used."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "description": "Completion tokens the call used."
+          }
+        },
+        "artifact_type_input": "text",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "OUT",
+        "key": "output",
+        "label": null,
+        "port_type": "out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "answer": {
+            "type": "string",
+            "description": "The expert's reply."
+          },
+          "model": {
+            "type": "string",
+            "description": "The model that wrote the reply."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The model provider (openai)."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "description": "Prompt tokens the call used."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "description": "Completion tokens the call used."
+          }
+        },
+        "artifact_type_input": "text",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

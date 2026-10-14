@@ -1,0 +1,133 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "CONTEXT BUILDER (SYSTEM, READ-ONLY)",
+    "category": "TOOL",
+    "description": "What it does Combines a question and the passages a search step found into one prompt, ready for a language model to answer from. It is the step between retrieval and generation in a question-answering flow.\n\nHow it works Tell it where the question and the retrieved passages are in the incoming data, as ${field} references - ${query} and ${sources} by default, or a nested path such as ${search.results}. The passages are numbered [1], [2] and so on into a context block, and the block and the question are written into the prompt template. Everything that arrived is passed on as well, so the next node still sees the retriever's own fields. If a reference points at a field that is not there, the question is empty, or the template has nowhere to put the passages, the run fails instead of sending the model a prompt that lost its question or its context. No passages at all is fine: the retriever simply found nothing.\n\nConfigure\n- Prompt Template - the prompt, with {context} for the numbered passages, {query} for the question and {sources_json} for the passages as raw JSON.\n- Query Field - ${dotted.path} to the question. ${query} by default.\n- Sources Field - ${dotted.path} to the list of passages. ${sources} by default. Each passage's text, content, chunk or page_content field is used, or the whole passage when it has none.\n\nIn and out In: data carrying the question and the list of retrieved passages. Out: the incoming data plus prompt, context, query and source_count.\n\nUse it when\n- Building a question-answering flow over your own documents.\n- You want to control exactly how retrieved passages are presented to the model.\n- A search step and a language model step need joining with a prompt in between.",
+    "short_description": "Combines a question and the passages a retriever found into one prompt for a language model to answer from.",
+    "tags": [
+      "template",
+      "tool",
+      "rag",
+      "prompt",
+      "context"
+    ],
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "layers"
+      },
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "input_parameters": {
+        "values": {
+          "prompt_template": "Answer the following question based on the provided context.\n\nContext:\n{context}\n\nQuestion: {query}\n\nAnswer:",
+          "query_field": "${query}",
+          "sources_field": "${sources}"
+        },
+        "declarations": [
+          {
+            "name": "prompt_template",
+            "type": "text_long",
+            "label": "Prompt Template",
+            "default": "Answer the following question based on the provided context.\n\nContext:\n{context}\n\nQuestion: {query}\n\nAnswer:",
+            "required": false,
+            "description": "The prompt. {context} becomes the numbered sources, {query} the question, and {sources_json} the sources as JSON. It must contain {context} or {sources_json}."
+          },
+          {
+            "name": "query_field",
+            "type": "text",
+            "label": "Query Field",
+            "default": "${query}",
+            "required": false,
+            "description": "${dotted.path} reference to the question in the incoming data."
+          },
+          {
+            "name": "sources_field",
+            "type": "text",
+            "label": "Sources Field",
+            "default": "${sources}",
+            "required": false,
+            "description": "${dotted.path} reference to the retrieved sources in the incoming data."
+          }
+        ]
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "script": "\"\"\"Context Builder: assemble a retrieval-augmented prompt from a query and its sources.\n\nWhere the query and the retrieved sources live in the inbound data is set per\nnode as ``${dotted.path}`` references, so the tool fits downstream of any\nretriever. The sources are numbered into a context block and written into the\nprompt template, which is returned for an LLM node downstream to send.\n\"\"\"\n\nimport json\nimport re\n\nimport perceivo\n\n_DEFAULT_TEMPLATE = (\n    \"Answer the following question based on the provided context.\\n\\n\"\n    \"Context:\\n{context}\\n\\n\"\n    \"Question: {query}\\n\\n\"\n    \"Answer:\"\n)\n_DEFAULT_QUERY_FIELD = \"${query}\"\n_DEFAULT_SOURCES_FIELD = \"${sources}\"\n\n# The template's slots. Filled in one pass, so text inside a source that happens\n# to read \"{query}\" is never itself substituted.\n_SLOT = re.compile(r\"\\{(context|query|sources_json)\\}\")\n_REFERENCE = re.compile(r\"\\$\\{\\s*([\\w.]+)\\s*\\}\")\n# Field names retrievers commonly use for a source's text.\n_TEXT_KEYS = (\"text\", \"content\", \"chunk\", \"page_content\")\n_ABSENT = object()\n\n\ndef _lookup(data, path: str):\n    \"\"\"The value at a dotted path inside nested dicts, or _ABSENT.\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if not isinstance(value, dict) or part not in value:\n            return _ABSENT\n        value = value[part]\n    return value\n\n\ndef _reference(name: str, label: str, default: str) -> str:\n    \"\"\"The dotted path inside a ``${...}`` reference parameter.\"\"\"\n    raw = str(perceivo.params.get(name, default) or default).strip()\n    match = _REFERENCE.fullmatch(raw)\n    if not match:\n        raise ValueError(f\"{label} is {raw!r}; it must be a reference such as {default}.\")\n    return match.group(1)\n\n\ndef _resolve(request_data: dict, path: str, label: str):\n    value = _lookup(request_data, path)\n    if value is _ABSENT:\n        raise ValueError(\n            f\"{label} points at ${{{path}}}, which the incoming data does not carry. \"\n            f\"Fields received: {sorted(request_data)}.\"\n        )\n    return value\n\n\ndef _source_text(source) -> str:\n    \"\"\"The text of one source: its first text-like field, else the source as JSON.\"\"\"\n    if isinstance(source, dict):\n        for key in _TEXT_KEYS:\n            value = source.get(key)\n            if isinstance(value, str) and value:\n                return value\n        return json.dumps(source, default=str)\n    return str(source)\n\n\n@perceivo.tool\nasync def context_builder(input: perceivo.primitives.ToolInput) -> perceivo.primitives.ToolOutput:\n    \"\"\"Build the prompt and pass every inbound field through alongside it.\n\n    Reads request_data only and emits no artifact. A reference that points at a\n    field the inbound data does not carry, an empty query, or a template with\n    no place for the sources raises ValueError: a prompt that silently lost its\n    question or its context is never passed downstream. An empty source list is\n    valid -- the retriever found nothing -- and yields an empty context.\n    \"\"\"\n    request_data = input.request_data or {}\n\n    template = str(perceivo.params.get(\"prompt_template\", _DEFAULT_TEMPLATE) or _DEFAULT_TEMPLATE)\n    if \"{context}\" not in template and \"{sources_json}\" not in template:\n        raise ValueError(\n            \"Prompt Template has no {context} or {sources_json}, so the retrieved \"\n            \"sources would be dropped. Add one of them.\"\n        )\n\n    query_path = _reference(\"query_field\", \"Query Field\", _DEFAULT_QUERY_FIELD)\n    sources_path = _reference(\"sources_field\", \"Sources Field\", _DEFAULT_SOURCES_FIELD)\n\n    query = _resolve(request_data, query_path, \"Query Field\")\n    query = (query if isinstance(query, str) else json.dumps(query, default=str)).strip()\n    if not query:\n        raise ValueError(f\"The query at ${{{query_path}}} is empty.\")\n\n    sources = _resolve(request_data, sources_path, \"Sources Field\")\n    if sources is None:\n        sources = []\n    elif not isinstance(sources, list):\n        sources = [sources]\n\n    context = \"\\n\\n\".join(f\"[{number}] {_source_text(source)}\" for number, source in enumerate(sources, 1))\n    slots = {\n        \"context\": context,\n        \"query\": query,\n        \"sources_json\": json.dumps(sources, default=str),\n    }\n    prompt = _SLOT.sub(lambda match: slots[match.group(1)], template)\n\n    perceivo.log.info(\n        \"Context Builder: prompt assembled\",\n        prompt_chars=len(prompt),\n        source_count=len(sources),\n    )\n\n    return perceivo.primitives.ToolOutput(\n        response_data={\n            **request_data,\n            \"prompt\": prompt,\n            \"context\": context,\n            \"query\": query,\n            \"source_count\": len(sources),\n        },\n    )\n",
+    "manifest_yaml": "extension_type: tool\nname: Context Builder\ndescription: >\n  Assembles a retrieval-augmented prompt from a query and the sources a\n  retriever returned. Both are located by configurable ${dotted.path}\n  references, so it sits downstream of any retriever. A reference to a field\n  that is not there, an empty query, or a template with no place for the\n  sources raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # request_data only. The script never reads input.artifact and never emits\n    # one, so `none` is true in both directions.\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      query: string (optional) - Default location of the question, overridable via the Query Field parameter.\n      sources: array (optional) - Default location of the retrieved sources, overridable via the Sources Field parameter.\n    # The Output spreads its inbound request_data first\n    # (`{**request_data, ...}`) so a retriever's own fields stay available to\n    # the LLM node downstream. Nothing is popped, so there is no _except list.\n    response_data_passthrough: request_data\n    response_data:\n      prompt: string - The assembled prompt, with {context}, {query} and {sources_json} filled in.\n      context: string - The retrieved sources rendered as a numbered block.\n      query: string - The question that was resolved.\n      source_count: integer - Number of sources folded into the context.\n\ninput_parameters:\n- name: prompt_template\n  type: text_long\n  label: Prompt Template\n  default: 'Answer the following question based on the provided context.\n\n\n    Context:\n\n    {context}\n\n\n    Question: {query}\n\n\n    Answer:'\n  required: false\n  description: The prompt. {context} becomes the numbered sources, {query} the question, and {sources_json} the sources as JSON. It must contain {context} or {sources_json}.\n- name: query_field\n  type: text\n  label: Query Field\n  default: ${query}\n  required: false\n  description: ${dotted.path} reference to the question in the incoming data.\n- name: sources_field\n  type: text\n  label: Sources Field\n  default: ${sources}\n  required: false\n  description: ${dotted.path} reference to the retrieved sources in the incoming data.\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "query": {
+            "type": "string",
+            "required": false,
+            "description": "Default location of the question, overridable via the Query Field parameter."
+          },
+          "sources": {
+            "type": "array",
+            "required": false,
+            "description": "Default location of the retrieved sources, overridable via the Sources Field parameter."
+          }
+        },
+        "response_data_schema": {
+          "prompt": {
+            "type": "string",
+            "required": true,
+            "description": "The assembled prompt, with {context}, {query} and {sources_json} filled in."
+          },
+          "context": {
+            "type": "string",
+            "required": true,
+            "description": "The retrieved sources rendered as a numbered block."
+          },
+          "query": {
+            "type": "string",
+            "required": true,
+            "description": "The question that was resolved."
+          },
+          "source_count": {
+            "type": "integer",
+            "required": true,
+            "description": "Number of sources folded into the context."
+          }
+        },
+        "artifact_type_input": "none",
+        "artifact_type_output": "none",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "none"
+        ],
+        "response_data_passthrough": "request_data",
+        "response_data_passthrough_except": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

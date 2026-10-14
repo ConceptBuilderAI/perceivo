@@ -1,0 +1,86 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:55:29.050010Z",
+  "component": {
+    "asset_id": null,
+    "name": "Story Start",
+    "category": "START",
+    "description": "Turns the opening lines you type into the story artifact.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "start"
+    ],
+    "config": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\nfrom perceivo.primitives import Artifact, ArtifactType, StartInput, StartOutput\n\n\n@perceivo.start\nasync def story_start(input: StartInput) -> StartOutput:\n    \"\"\"Make the opening lines the story artifact, and count its words.\"\"\"\n    opening = input.request_data.get(\"opening\", \"\").strip()\n    if not opening:\n        raise ValueError(\"'opening' is required.\")\n\n    return StartOutput(\n        # The artifact carries the story to the next component.\n        artifact=Artifact(type=ArtifactType.TEXT, data=opening),\n        # Response data carries facts about it.\n        response_data={\"words_in_opening\": len(opening.split())},\n    )\n",
+    "manifest_yaml": "extension_type: START\nname: Story Start\ndescription: Turns the opening lines you type into the story artifact.\ntags:\n  - beginner\n  - start\nexternal_in_port:\n  port_name: external_in\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: text\n  request_data:\n    opening:\n      type: string\n      description: The first lines of a story.\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_input: json\n    # The artifact is the work itself: the story, as text.\n    artifact_type_output: text\n    # Response data is small, structured facts about the work.\n    response_data:\n      words_in_opening:\n        type: integer\n        description: How many words the opening has.\ninput_parameters: []\ninput_prompt: Type the first lines of a story.\nrequired_secrets: []\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "external_in",
+        "label": null,
+        "port_type": "external_in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "opening": {
+            "type": "string",
+            "description": "The first lines of a story."
+          }
+        },
+        "response_data_schema": null,
+        "artifact_type_input": "json",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "OUT",
+        "key": "output",
+        "label": null,
+        "port_type": "out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "words_in_opening": {
+            "type": "integer",
+            "description": "How many words the opening has."
+          }
+        },
+        "artifact_type_input": "json",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "component": {
+    "additional_packages": null,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "asset_id": null,
+    "category": "END",
+    "config": {
+      "detected_endpoints": [],
+      "extension_id": "64d115d4-784a-4dec-b69f-710e58631497",
+      "is_generic_end": true,
+      "output_parameters": {
+        "declarations": [
+          {
+            "_schema_type": "string",
+            "label": "response",
+            "name": "response",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "_schema_type": "integer",
+            "label": "tokens_in",
+            "name": "tokens_in",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "_schema_type": "integer",
+            "label": "tokens_out",
+            "name": "tokens_out",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "values": {}
+      },
+      "port_order": [
+        "input",
+        "external_output"
+      ],
+      "icon": {
+        "type": "lucide",
+        "value": "flag"
+      }
+    },
+    "description": "What it does The exit of an orchestration. Whatever the last component produced becomes the result the caller receives.\n\nHow it works Every orchestration needs exactly one end. This one adds nothing: the response data and any file or document reaching its input port go out of its external port unchanged, as the run's result. Because it makes no assumptions about shape, it suits any flow.\n\nConfigure The output contract, in the Inspector: declare the fields the result carries, their types and whether each is required. Saving the orchestration bakes that contract into this node's own copy; the shared template is never changed.\n\nIn and out In: whatever the previous component produced, data and optionally a file or document. Out: both, unchanged, as the run result.\n\nUse it when\n- You are building any orchestration and want the last component's output returned as-is.\n- The caller should see the full result rather than a summary.\n- You are replacing a hand-written end component that only passed data through.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: optional(json)\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\n",
+    "name": "GENERIC END (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "optional(json)",
+        "artifact_types": null,
+        "base_schema": null,
+        "contract": {
+          "properties": {
+            "response": {
+              "type": "string"
+            },
+            "tokens_in": {
+              "type": "integer"
+            },
+            "tokens_out": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "response",
+            "tokens_in",
+            "tokens_out"
+          ],
+          "type": "object"
+        },
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "multi_artifact": false,
+        "port_type": "in",
+        "post_tool_contract": null,
+        "request_data_schema": null,
+        "response_data_contract": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_schema": {
+          "properties": {
+            "response": {
+              "type": "string"
+            },
+            "tokens_in": {
+              "type": "integer"
+            },
+            "tokens_out": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "response",
+            "tokens_in",
+            "tokens_out"
+          ],
+          "type": "object"
+        },
+        "tool_call": false
+      },
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "json",
+        "artifact_type_output": "optional(json)",
+        "artifact_types": null,
+        "base_schema": null,
+        "contract": {
+          "properties": {
+            "response": {
+              "type": "string"
+            },
+            "tokens_in": {
+              "type": "integer"
+            },
+            "tokens_out": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "response",
+            "tokens_in",
+            "tokens_out"
+          ],
+          "type": "object"
+        },
+        "direction": "OUT",
+        "key": "external_output",
+        "label": "External Output",
+        "multi_artifact": false,
+        "port_type": "external_out",
+        "post_tool_contract": null,
+        "request_data_schema": null,
+        "response_data_contract": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_schema": {
+          "properties": {
+            "response": {
+              "type": "string"
+            },
+            "tokens_in": {
+              "type": "integer"
+            },
+            "tokens_out": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "response",
+            "tokens_in",
+            "tokens_out"
+          ],
+          "type": "object"
+        },
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "import perceivo\n\n\n@perceivo.end\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    return perceivo.primitives.EndOutput(\n        artifact=input.artifact,\n        response_data=input.response_data or {},\n        artifacts=input.artifacts or {},\n    )\n",
+    "short_description": "The default exit point: returns whatever the last component produced as the result of the run.",
+    "tags": [
+      "template",
+      "control-flow",
+      "end"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-07-31T15:29:57.271761Z"
+}

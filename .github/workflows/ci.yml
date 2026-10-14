@@ -1,0 +1,208 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  RUFF_VERSION: "0.16.7"
+  MYPY_VERSION: "2.3.1"
+  PYYAML_STUBS_VERSION: "6.0.12.20260906"
+  SETUPTOOLS_STUBS_VERSION: "84.0.0.20260812"
+  # The canonical build toolchain is pinned in build-distributions.yml.
+
+jobs:
+  integrity:
+    name: Repository integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Verify provenance and public boundary
+        run: python scripts/verify_public_tree.py verify --root .
+
+  quality:
+    name: Format, lint, and type contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package and pinned quality tools
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pip install \
+            "ruff==$RUFF_VERSION" \
+            "mypy==$MYPY_VERSION" \
+            "types-PyYAML==$PYYAML_STUBS_VERSION" \
+            "types-setuptools==$SETUPTOOLS_STUBS_VERSION"
+      - name: Ruff lint
+        run: python -m ruff check perceivo tests scripts
+      - name: Ruff format
+        run: python -m ruff format --check perceivo tests scripts
+      - name: Mypy
+        run: |
+          python -m mypy --explicit-package-bases perceivo tests/unit scripts/verify_public_tree.py \
+            scripts/check_release_tag.py scripts/check_workflow_policy.py \
+            scripts/compare_index_artifacts.py scripts/check_release_settings.py
+          python -m mypy --strict tests/typing
+
+  test:
+    name: Unit tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package and test dependencies
+        run: |
+          # The portable unit suite covers perceivo/local/adapters/redis.py's real
+          # (non-mock) client wrapper, which imports redis.asyncio directly, so the
+          # optional extra the package already declares is installed here too.
+          python -m pip install -e ".[dev,redis]"
+          python -m pip install "types-PyYAML==$PYYAML_STUBS_VERSION"
+      - name: Run public unit suite at the declared coverage floor
+        run: python -m pytest -q
+      - name: Check each orchestration example against its archive pins
+        run: python -B scripts/refresh_example_hashes.py --source HEAD
+
+  build:
+    name: Build
+    needs: [integrity, quality, test]
+    permissions:
+      contents: read
+    # The canonical build lives in build-distributions.yml so that release.yml
+    # uploads the output of exactly this job definition. It archives the source
+    # head, not the synthetic pull-request merge commit.
+    uses: ./.github/workflows/build-distributions.yml
+
+  workflow-policy:
+    name: Workflow policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Check every workflow and the release closure
+        run: |
+          python -m pip install --only-binary :all: "pyyaml==6.0.3"
+          python scripts/check_workflow_policy.py --root .
+
+  release-tag-selftest:
+    name: Release tag self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Accept the tag this commit would be released under
+        run: |
+          # A local-only tag on the checked-out commit; nothing is pushed.
+          tag="v$(cat VERSION)"
+          git tag "$tag" HEAD
+          python scripts/check_release_tag.py --tag "$tag" --commit "$(git rev-parse HEAD)" --main-ref HEAD
+      - name: Refuse tags that are not the release version in normal form
+        run: |
+          head="$(git rev-parse HEAD)"
+          version="$(cat VERSION)"
+          for bad in "${version}" "v${version}-rc.1" "v${version}.rc1" "v0${version}" "v9${version}"; do
+            git tag "$bad" HEAD
+            if python scripts/check_release_tag.py --tag "$bad" --commit "$head" --main-ref HEAD; then
+              echo "tag $bad was accepted"; exit 1
+            fi
+          done
+
+  install-smoke:
+    name: Install smoke (${{ matrix.archive }})
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        archive: [wheel, sdist]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: distributions
+          path: dist
+      - name: Verify the files against the build job's outputs
+        env:
+          WHEEL_NAME: ${{ needs.build.outputs.wheel_name }}
+          WHEEL_SHA256: ${{ needs.build.outputs.wheel_sha256 }}
+          SDIST_NAME: ${{ needs.build.outputs.sdist_name }}
+          SDIST_SHA256: ${{ needs.build.outputs.sdist_sha256 }}
+        run: |
+          set -euo pipefail
+          for digest in "$WHEEL_SHA256" "$SDIST_SHA256"; do
+            [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo "build output is not a sha256: '$digest'"; exit 1; }
+          done
+          [[ "$WHEEL_NAME" =~ ^[A-Za-z0-9_.+-]+\.whl$ ]] || { echo "bad wheel name output: '$WHEEL_NAME'"; exit 1; }
+          [[ "$SDIST_NAME" =~ ^[A-Za-z0-9_.+-]+\.tar\.gz$ ]] || { echo "bad sdist name output: '$SDIST_NAME'"; exit 1; }
+          test "$(ls -A dist | wc -l)" -eq 2
+          printf '%s  %s\n%s  %s\n' "$WHEEL_SHA256" "$WHEEL_NAME" "$SDIST_SHA256" "$SDIST_NAME" > expected.sha256
+          (cd dist && sha256sum --strict -c ../expected.sha256)
+      - name: Select and install one archive
+        env:
+          ARCHIVE_KIND: ${{ matrix.archive }}
+        run: |
+          if [ "$ARCHIVE_KIND" = wheel ]; then
+            artifact=$(find dist -maxdepth 1 -name '*.whl' -print -quit)
+          else
+            artifact=$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)
+          fi
+          test -n "$artifact"
+          python -m pip install "$artifact"
+      - name: Verify installed metadata and import origin
+        env:
+          EXPECTED_VERSION_FILE: ${{ github.workspace }}/source/VERSION
+          CHECKOUT_ROOT: ${{ github.workspace }}/source
+        working-directory: /tmp
+        run: |
+          python -c "import importlib.metadata as m, os, pathlib, perceivo; expected=pathlib.Path(os.environ['EXPECTED_VERSION_FILE']).read_text().strip(); origin=pathlib.Path(perceivo.__file__).resolve(); assert m.version('perceivo') == expected == perceivo.__version__; assert not origin.is_relative_to(pathlib.Path(os.environ['CHECKOUT_ROOT']).resolve())"
+      - name: Verify installed CLI and authoring imports
+        working-directory: /tmp
+        run: |
+          perceivo --help
+          perceivo --version
+          python -c "import perceivo, perceivo.primitives as p; from perceivo import agent, policy, orchestration; from perceivo.primitives import Agent, Policy; assert perceivo.agent is p.agent and perceivo.policy is p.policy; assert Agent and Policy and orchestration"

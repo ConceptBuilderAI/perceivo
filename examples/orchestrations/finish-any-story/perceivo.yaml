@@ -1,0 +1,26 @@
+# perceivo.yaml — local development configuration
+version: 1
+
+files:
+  working_dir: ./working_files
+  org_dir: ./org_files
+
+# Secrets are read from .env if it exists, otherwise from environment variables
+# of the same name (for example ANTHROPIC_API_KEY).
+secrets:
+  source: dotenv
+  dotenv_path: .env
+
+# "local" lets the agent call the model provider for real, with your own API key.
+# Change llm to "mock" to run offline with a canned reply instead.
+mocks:
+  modes:
+    llm: local
+
+redis:
+  enabled: false
+  url: redis://localhost:6379
+
+logging:
+  level: INFO
+  format: console

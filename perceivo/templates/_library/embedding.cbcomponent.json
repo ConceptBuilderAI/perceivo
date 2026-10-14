@@ -1,0 +1,146 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "EMBEDDING (SYSTEM, READ-ONLY)",
+    "category": "AGENT",
+    "description": "What it does Turns pieces of text into embeddings - lists of numbers that capture what the text means - using OpenAI's embedding models, so a vector database can later find the passages closest in meaning to a question.\n\nHow it works Point it at the field holding the list of texts; chunks, the default, is what a text splitter produces. The texts are sent to OpenAI in batches using your organization's OpenAI key, bound as a secret and never written into the template. The vectors come back in the same order as the texts and next to them, and everything else in the incoming data passes through untouched. An empty list is fine and produces no vectors. A missing field, an unbound key or a failed request fails the run - a partial result is never passed on.\n\nConfigure\n- Embedding Model - text-embedding-3-small (default), text-embedding-3-large or text-embedding-ada-002. Index and search with the same model.\n- Texts Field - where the list of texts is in the incoming data; chunks by default. A dotted path such as result.chunks reaches nested data.\n- OpenAI API Key - bind the organization secret holding the key.\n\nIn and out In: data, or a JSON artifact, carrying a list of texts. Out: the incoming data plus embeddings, texts, embedding_count, embedding_model and dimensions.\n\nUse it when\n- Indexing documents into a vector database for search or question answering.\n- Embedding a user's question so it can be matched against indexed documents.\n- Comparing pieces of text by meaning rather than by wording.",
+    "short_description": "Turns a list of texts into OpenAI embedding vectors, in order, for a vector database to store or search.",
+    "tags": [
+      "template",
+      "agent",
+      "embedding",
+      "rag",
+      "openai"
+    ],
+    "config": {
+      "input_parameters": {
+        "values": {
+          "model": "text-embedding-3-small",
+          "texts_field": "chunks"
+        },
+        "declarations": [
+          {
+            "name": "model",
+            "type": "select",
+            "label": "Embedding Model",
+            "options": [
+              "text-embedding-3-small",
+              "text-embedding-3-large",
+              "text-embedding-ada-002"
+            ],
+            "default": "text-embedding-3-small",
+            "required": true,
+            "description": "OpenAI embedding model. Use the same model to index documents and to embed questions."
+          },
+          {
+            "name": "texts_field",
+            "type": "text",
+            "label": "Texts Field",
+            "default": "chunks",
+            "required": true,
+            "description": "Field of the incoming data (or JSON artifact) holding the list of texts. A dotted path such as result.chunks reaches nested data."
+          }
+        ]
+      },
+      "required_secrets": [
+        {
+          "name": "openai_api_key",
+          "label": "OpenAI API Key",
+          "required": true,
+          "description": "OpenAI API key used for the embeddings request."
+        }
+      ],
+      "icon": {
+        "type": "lucide",
+        "value": "binary"
+      },
+      "detected_endpoints": [
+        {
+          "category": "http_client",
+          "library": "httpx",
+          "host": null,
+          "confidence": "detected",
+          "description": "HTTP client (httpx)"
+        },
+        {
+          "category": "http_client",
+          "library": "url_literal",
+          "host": "api.openai.com",
+          "confidence": "detected",
+          "description": "HTTP endpoint: api.openai.com"
+        }
+      ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "json",
+    "artifact_type_output": "json",
+    "script": "\"\"\"Embedding: turn a list of text chunks into vectors with the OpenAI embeddings API.\n\nThe texts are read from one configured field of the inbound data, embedded in\nbatches, and returned in input order next to the texts themselves, so a vector\nstore downstream can store each vector with the text it came from. The OpenAI\nkey is the ``openai_api_key`` secret bound on the node; it is sent only in the\nrequest header and never logged.\n\"\"\"\n\nimport httpx\nimport perceivo\n\n_EMBEDDINGS_URL = \"https://api.openai.com/v1/embeddings\"\n_MODELS = (\"text-embedding-3-small\", \"text-embedding-3-large\", \"text-embedding-ada-002\")\n_DEFAULT_MODEL = \"text-embedding-3-small\"\n_DEFAULT_TEXTS_FIELD = \"chunks\"\n_REQUEST_TIMEOUT_SECONDS = 60.0\n# Inputs per request; well inside the API's per-request limit.\n_BATCH_SIZE = 96\n_ABSENT = object()\n\n\ndef _lookup(data, path: str):\n    \"\"\"The value at a dotted path inside nested dicts, or _ABSENT.\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if not isinstance(value, dict) or part not in value:\n            return _ABSENT\n        value = value[part]\n    return value\n\n\ndef _texts(data, request_data: dict, field: str) -> list:\n    \"\"\"The strings to embed, from the inbound artifact's data or request_data.\n\n    The artifact data may be a JSON object carrying the field, a bare list, or a\n    single string; otherwise the field is read from request_data.\n    \"\"\"\n    if isinstance(data, list):\n        found = data\n    elif isinstance(data, str) and data.strip():\n        found = [data]\n    else:\n        found = _lookup(data, field) if isinstance(data, dict) else _ABSENT\n        if found is _ABSENT:\n            found = _lookup(request_data, field)\n    if found is _ABSENT:\n        raise ValueError(\n            f\"No texts found at {field!r}. Set Texts Field to where the incoming data \"\n            f\"carries the list of texts. Fields received: {sorted(request_data)}.\"\n        )\n    if isinstance(found, str):\n        found = [found]\n    if not isinstance(found, list):\n        raise ValueError(f\"{field!r} holds a {type(found).__name__}; it must be a list of texts.\")\n    return [item if isinstance(item, str) else str(item) for item in found]\n\n\nasync def _embed_batch(client: httpx.AsyncClient, api_key: str, model: str, texts: list) -> list:\n    \"\"\"Embed one batch and return its vectors in input order.\"\"\"\n    response = await client.post(\n        _EMBEDDINGS_URL,\n        headers={\"Authorization\": f\"Bearer {api_key}\"},\n        json={\"model\": model, \"input\": texts},\n    )\n    if response.status_code != 200:\n        # The error type and code identify the failure without echoing the body.\n        try:\n            error = response.json().get(\"error\") or {}\n        except ValueError:\n            error = {}\n        raise RuntimeError(\n            f\"OpenAI embeddings request failed: HTTP {response.status_code} \"\n            f\"(type={error.get('type') or 'unknown'}, code={error.get('code') or 'unknown'}).\"\n        )\n    items = sorted(response.json()[\"data\"], key=lambda item: item[\"index\"])\n    if len(items) != len(texts):\n        raise RuntimeError(f\"OpenAI returned {len(items)} vectors for {len(texts)} texts.\")\n    return [item[\"embedding\"] for item in items]\n\n\n@perceivo.agent\nasync def embedding(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Embed the inbound texts and pass every inbound field through.\n\n    An empty list is a valid input and yields no vectors without calling the\n    API. A missing field, a missing key or an unknown model raises ValueError;\n    a failed API call raises RuntimeError, so a partial or failed embedding is\n    never passed downstream as a result.\n    \"\"\"\n    request_data = input.request_data or {}\n\n    model = str(perceivo.params.get(\"model\", _DEFAULT_MODEL) or _DEFAULT_MODEL).strip()\n    if model not in _MODELS:\n        raise ValueError(f\"Embedding Model is {model!r}. Choose one of: {', '.join(_MODELS)}.\")\n    field = str(perceivo.params.get(\"texts_field\", _DEFAULT_TEXTS_FIELD) or \"\").strip()\n    if not field:\n        raise ValueError(\"Texts Field is empty. Name the field that carries the texts, e.g. chunks.\")\n\n    artifact_data = input.artifact.data if input.artifact is not None else None\n    texts = _texts(artifact_data, request_data, field)\n\n    vectors = []\n    if texts:\n        api_key = await perceivo.secrets.get(\"openai_api_key\", None)\n        if not api_key:\n            raise ValueError(\n                \"The openai_api_key secret is not bound. Bind an OpenAI API key to this node.\"\n            )\n        async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT_SECONDS) as client:\n            for start in range(0, len(texts), _BATCH_SIZE):\n                vectors.extend(await _embed_batch(client, api_key, model, texts[start:start + _BATCH_SIZE]))\n    else:\n        perceivo.log.warning(\"Embedding: the texts list is empty; nothing embedded\", field=field)\n\n    dimensions = len(vectors[0]) if vectors else 0\n    perceivo.log.info(\"Embedding complete\", model=model, count=len(vectors), dimensions=dimensions)\n\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data={\"embedding_count\": len(vectors), \"dimensions\": dimensions, \"embedding_model\": model},\n            mime_type=\"application/json\",\n        ),\n        response_data={\n            **request_data,\n            \"embeddings\": vectors,\n            \"texts\": texts,\n            \"embedding_count\": len(vectors),\n            \"embedding_model\": model,\n            \"dimensions\": dimensions,\n        },\n    )\n",
+    "manifest_yaml": "extension_type: agent\nname: Embedding\ndescription: >\n  Embeds a list of texts with the OpenAI embeddings API, in batches, and\n  returns the vectors in input order next to the texts, with every inbound\n  field passed through. An empty list yields no vectors; a missing field,\n  key or failed request raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The texts may arrive as the artifact (a list, a string, or an object\n    # carrying Texts Field) or in request_data, so the artifact is optional.\n    artifact_type_input: optional(json)\n    request_data:\n      chunks: array (optional) - Default location of the texts, overridable via the Texts Field parameter.\n    artifact_type_output: json\n    # Upstream fields are spread into the result (`{**request_data, ...}`).\n    response_data_passthrough: request_data\n    response_data:\n      embeddings: array - Embedding vectors, one per text, in input order.\n      texts: array - The texts that were embedded, aligned with embeddings.\n      embedding_count: integer - Number of vectors produced.\n      embedding_model: string - Embedding model that produced the vectors.\n      dimensions: integer - Length of each vector (0 when nothing was embedded).\n\nrequired_secrets:\n- name: openai_api_key\n  label: OpenAI API Key\n  required: true\n  description: OpenAI API key used for the embeddings request.\n\ninput_parameters:\n- name: model\n  type: select\n  label: Embedding Model\n  options:\n  - text-embedding-3-small\n  - text-embedding-3-large\n  - text-embedding-ada-002\n  default: text-embedding-3-small\n  required: true\n  description: OpenAI embedding model. Use the same model to index documents and to embed questions.\n- name: texts_field\n  type: text\n  label: Texts Field\n  default: chunks\n  required: true\n  description: Field of the incoming data (or JSON artifact) holding the list of texts. A dotted path such as result.chunks reaches nested data.\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "chunks": {
+            "type": "array",
+            "required": false,
+            "description": "Default location of the texts, overridable via the Texts Field parameter."
+          }
+        },
+        "response_data_schema": {
+          "embeddings": {
+            "type": "array",
+            "required": true,
+            "description": "Embedding vectors, one per text, in input order."
+          },
+          "texts": {
+            "type": "array",
+            "required": true,
+            "description": "The texts that were embedded, aligned with embeddings."
+          },
+          "embedding_count": {
+            "type": "integer",
+            "required": true,
+            "description": "Number of vectors produced."
+          },
+          "embedding_model": {
+            "type": "string",
+            "required": true,
+            "description": "Embedding model that produced the vectors."
+          },
+          "dimensions": {
+            "type": "integer",
+            "required": true,
+            "description": "Length of each vector (0 when nothing was embedded)."
+          }
+        },
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "json",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ],
+        "response_data_passthrough_except": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

@@ -1,0 +1,4 @@
+.env
+working_files/
+.perceivo/
+__pycache__/

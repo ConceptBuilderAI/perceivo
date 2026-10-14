@@ -1,0 +1,194 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "CHAT CHANNEL GATEWAY (SYSTEM, READ-ONLY)",
+    "category": "TOOL",
+    "description": "What it does Sends one message to a Telegram chat, a Slack or Discord channel, or a Microsoft Teams channel, from any point in an orchestration - a build result, an alert, a summary for the team.\n\nHow it works The message is written once in the Inspector. Anything in ${braces} is filled in from the data arriving at the node, so \"Nightly load finished: ${row_count} rows\" reads as the real number. The send goes through the platform's alert service and the organization's approved outbound routes; the platform credential stays an organization secret and is never written into the template. If the message does not arrive, the run fails - it is never reported as sent.\n\nConfigure\n- Platform - telegram, slack, discord or teams.\n- Recipient - the chat id (Telegram), channel id (Slack, Discord) or webhook URL (Teams).\n- Message - the body; ${field} placeholders are filled from incoming data.\n- Title, Action Button URL and Label - an optional header and link button.\n- Severity - info (default), warning or critical.\n- Enabled - turn it off to keep the node in place without sending anything.\n- Platform Credentials - bind the organization secret holding the bot token or webhook credential.\n\nIn and out In: any data; its fields fill the placeholders, and an optional fields object is shown as key/value pairs under the message. Out: the channel, the status (sent or skipped), the platform's delivery id and status, and a reason when skipped.\n\nUse it when\n- A run should tell people it finished, or that something needs attention.\n- An agent needs a tool it can call to post a message.\n- You want a notification step you can switch off without rewiring the canvas.",
+    "short_description": "Sends one message to Telegram, Slack, Discord or Teams, filling ${field} placeholders from incoming data.",
+    "tags": [
+      "template",
+      "tool",
+      "chat",
+      "notifications"
+    ],
+    "config": {
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "input_parameters": {
+        "values": {
+          "platform": "",
+          "recipient": "",
+          "message": "",
+          "title": "",
+          "action_url": "",
+          "action_label": "Open",
+          "severity": "info",
+          "enabled": true
+        },
+        "declarations": [
+          {
+            "name": "platform",
+            "type": "select",
+            "label": "Platform",
+            "options": [
+              "telegram",
+              "slack",
+              "discord",
+              "teams"
+            ],
+            "required": true,
+            "description": "Which chat platform to send the message to."
+          },
+          {
+            "name": "recipient",
+            "type": "text",
+            "label": "Recipient",
+            "required": true,
+            "description": "Where to send the message. Telegram: chat_id (numeric). Slack: channel ID (e.g. C0123456789). Discord: channel ID or webhook URL. Teams: incoming webhook URL."
+          },
+          {
+            "name": "message",
+            "type": "text_long",
+            "label": "Message",
+            "required": true,
+            "description": "Message body. Supports ${variable} interpolation from the input port."
+          },
+          {
+            "name": "title",
+            "type": "text",
+            "label": "Title",
+            "required": false,
+            "description": "Optional bold header line for the message."
+          },
+          {
+            "name": "action_url",
+            "type": "text",
+            "label": "Action Button URL",
+            "required": false,
+            "description": "Optional URL for a clickable button (Telegram inline keyboard, Slack button, Discord embed link, Teams action)."
+          },
+          {
+            "name": "action_label",
+            "type": "text",
+            "label": "Action Button Label",
+            "default": "Open",
+            "required": false,
+            "depends_on": {
+              "parameter": "action_url",
+              "visible_when": "not_empty"
+            },
+            "description": "Text displayed on the action button."
+          },
+          {
+            "name": "severity",
+            "type": "select",
+            "label": "Severity",
+            "default": "info",
+            "options": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "required": false,
+            "description": "Affects message color/styling on platforms that support it."
+          },
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "label": "Enabled",
+            "default": true,
+            "required": false,
+            "description": "When false, skip delivery and return an explicit skipped result."
+          }
+        ]
+      },
+      "required_secrets": [
+        {
+          "name": "credentials",
+          "label": "Platform Credentials",
+          "required": true,
+          "description": "Bot token, webhook URL, or access token for the target chat platform."
+        }
+      ],
+      "template_source_id": "00000000-0000-0000-000b-000000000001",
+      "icon": {
+        "type": "lucide",
+        "value": "message-square"
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "none",
+    "artifact_type_output": "none",
+    "script": "import re\n\nimport perceivo\n\n_PLATFORMS = (\"telegram\", \"slack\", \"discord\", \"teams\")\n_SEVERITIES = (\"info\", \"warning\", \"critical\")\n_FALSY = (\"false\", \"0\", \"no\", \"off\")\n\n# ${field} placeholders in the message, title and action URL are filled from\n# the inbound request_data. An unknown field is left as written, so a typo is\n# visible in the delivered message rather than silently blanked.\n_PLACEHOLDER = re.compile(r\"\\$\\{(\\w+)\\}\")\n\n\ndef _interpolate(template: str, data: dict) -> str:\n    \"\"\"Replace each ${field} with str(data[field]) when that field is present.\"\"\"\n\n    def _replace(match):\n        value = data.get(match.group(1))\n        return match.group(0) if value is None else str(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    return str(perceivo.params.get(name, default) or default).strip()\n\n\ndef _enabled() -> bool:\n    value = perceivo.params.get(\"enabled\", True)\n    if isinstance(value, bool):\n        return value\n    return str(value).strip().lower() not in _FALSY\n\n\ndef _fields(data: dict):\n    \"\"\"The optional key/value block rendered under the message, as strings.\"\"\"\n    fields = data.get(\"fields\")\n    if not isinstance(fields, dict) or not fields:\n        return None\n    return {str(key): str(value) for key, value in fields.items()}\n\n\n@perceivo.tool\nasync def chat_channel_gateway(input: perceivo.primitives.ToolInput) -> perceivo.primitives.ToolOutput:\n    \"\"\"Send one message to one chat platform.\n\n    The platform, recipient and message are node parameters; the inbound\n    request_data only fills ${field} placeholders and supplies the optional\n    `fields` block. The platform credential is the `credentials` secret, passed\n    to the SDK by NAME -- this script never sees its id or its value.\n\n    A misconfigured node raises ValueError, and a failed dispatch raises from\n    `perceivo.alerts.send_direct`. Neither is caught: a message that did not\n    arrive must fail the run, never be reported as sent. The one outcome other\n    than \"sent\" is \"skipped\", when the Enabled switch is off.\n    \"\"\"\n    data = input.request_data or {}\n    if not isinstance(data, dict):\n        data = {}\n\n    platform = _param(\"platform\").lower()\n\n    if not _enabled():\n        perceivo.log.info(\"Chat Channel Gateway: disabled, nothing sent\", channel=platform)\n        return perceivo.primitives.ToolOutput(\n            response_data={\n                \"channel\": platform,\n                \"status\": \"skipped\",\n                \"delivery_id\": \"\",\n                \"platform_status\": \"\",\n                \"reason\": \"channel_disabled\",\n            },\n        )\n\n    if platform not in _PLATFORMS:\n        raise ValueError(f\"Platform is {platform!r}. Choose one of: {', '.join(_PLATFORMS)}.\")\n\n    recipient = _param(\"recipient\")\n    if not recipient:\n        raise ValueError(\n            \"Recipient is empty. Set the chat id (Telegram), channel id (Slack, \"\n            \"Discord) or webhook URL (Teams).\"\n        )\n\n    message = _interpolate(_param(\"message\"), data).strip()\n    if not message:\n        raise ValueError(\"Message is empty. Set the Message parameter.\")\n\n    severity = _param(\"severity\", \"info\").lower()\n    if severity not in _SEVERITIES:\n        raise ValueError(f\"Severity is {severity!r}. Choose one of: {', '.join(_SEVERITIES)}.\")\n\n    title = _interpolate(_param(\"title\"), data) or None\n    action_url = _interpolate(_param(\"action_url\"), data) or None\n    action_label = _param(\"action_label\", \"Open\") if action_url else None\n\n    perceivo.log.info(\n        f\"Chat Channel Gateway: sending to {platform}\",\n        channel=platform,\n        message_chars=len(message),\n        has_title=bool(title),\n        has_action=bool(action_url),\n        severity=severity,\n    )\n\n    delivery = await perceivo.alerts.send_direct(\n        medium=platform,\n        recipient=recipient,\n        credentials_secret=\"credentials\",\n        message=message,\n        title=title,\n        action_url=action_url,\n        action_label=action_label,\n        severity=severity,\n        fields=_fields(data),\n    )\n\n    # send_direct raises on a failed dispatch; this guards the one remaining\n    # way to report an undelivered message as sent.\n    if not delivery.delivered:\n        raise RuntimeError(\n            f\"Chat Channel Gateway: {platform} did not confirm delivery \"\n            f\"(status {delivery.status!r}).\"\n        )\n\n    delivery_id = delivery.delivery_id or \"\"\n    perceivo.log.info(\n        f\"Chat Channel Gateway: sent to {platform}\",\n        channel=platform,\n        delivery_id=delivery_id,\n    )\n\n    return perceivo.primitives.ToolOutput(\n        response_data={\n            \"channel\": platform,\n            \"status\": \"sent\",\n            \"delivery_id\": delivery_id,\n            \"platform_status\": delivery.status or \"\",\n            \"reason\": \"\",\n        },\n    )\n",
+    "manifest_yaml": "extension_type: tool\nname: Chat Channel Gateway\ndescription: >\n  Sends one message to Telegram, Slack, Discord or Microsoft Teams through\n  perceivo.alerts.send_direct. ${field} placeholders in the message, title and\n  action URL are filled from request_data. A failed dispatch raises and fails\n  the run; the Enabled switch turns the node into a no-op that reports skipped.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # A TOOL reached by an INVOKE edge. It neither reads nor emits an artifact,\n    # and an INVOKE edge is checked in both directions, so both halves are none.\n    artifact_type_input: none\n    artifact_type_output: none\n    # Placeholders read request_data by whatever name the message names, so no\n    # specific inbound key is required. `fields` is the only key read by name.\n    request_data:\n      fields: object (optional) - Key/value pairs rendered under the message.\n    response_data:\n      channel: string - The platform the message was sent to.\n      status: string - sent, or skipped when the node is disabled. A failure raises instead.\n      delivery_id: string - The platform's delivery id; empty when skipped.\n      platform_status: string - The status the platform returned; empty when skipped.\n      reason: string - Why nothing was sent (channel_disabled); empty when sent.\n\nrequired_secrets:\n  - name: credentials\n    label: Platform Credentials\n    required: true\n    description: Bot token (Telegram, Slack, Discord) or webhook credential (Teams) for the chosen platform.\n\ninput_parameters:\n  - name: platform\n    type: select\n    label: Platform\n    options: [telegram, slack, discord, teams]\n    required: true\n  - name: recipient\n    type: text\n    label: Recipient\n    required: true\n    description: Chat id (Telegram), channel id (Slack, Discord) or webhook URL (Teams).\n  - name: message\n    type: text_long\n    label: Message\n    required: true\n    description: Message body. ${field} is replaced with that field from request_data.\n  - name: title\n    type: text\n    label: Title\n    description: Optional bold header. Accepts ${field} placeholders.\n  - name: action_url\n    type: text\n    label: Action Button URL\n    description: Optional button link. Accepts ${field} placeholders.\n  - name: action_label\n    type: text\n    label: Action Button Label\n    default: Open\n  - name: severity\n    type: select\n    label: Severity\n    options: [info, warning, critical]\n    default: info\n  - name: enabled\n    type: boolean\n    label: Enabled\n    default: true\n    required: false\n    description: When off, nothing is sent and the node reports status skipped.\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "fields": {
+            "type": "object",
+            "required": false,
+            "description": "Key/value pairs rendered under the message."
+          }
+        },
+        "response_data_schema": {
+          "channel": {
+            "type": "string",
+            "required": true,
+            "description": "The platform the message was sent to."
+          },
+          "status": {
+            "type": "string",
+            "required": true,
+            "description": "sent, or skipped when the node is disabled. A failure raises instead."
+          },
+          "delivery_id": {
+            "type": "string",
+            "required": true,
+            "description": "The platform's delivery id; empty when skipped."
+          },
+          "platform_status": {
+            "type": "string",
+            "required": true,
+            "description": "The status the platform returned; empty when skipped."
+          },
+          "reason": {
+            "type": "string",
+            "required": true,
+            "description": "Why nothing was sent (channel_disabled); empty when sent."
+          }
+        },
+        "artifact_type_input": "none",
+        "artifact_type_output": "none",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ]
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

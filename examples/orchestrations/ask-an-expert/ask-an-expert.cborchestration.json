@@ -1,0 +1,388 @@
+{
+  "export_version": "1.0",
+  "export_type": "orchestration",
+  "exported_at": "2026-10-11T22:55:24.796432Z",
+  "orchestration": {
+    "name": "Ask an Expert",
+    "description": "Ask any professional a question. A start, one ChatGPT agent and an end.",
+    "tags": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "runtime_config": null,
+    "disable_intermediate_snapshots": false
+  },
+  "components": {
+    "comp_0": {
+      "asset_id": null,
+      "name": "Intake",
+      "category": "START",
+      "description": "Takes a profession and a question and hands both to the expert.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "start"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import perceivo\nfrom perceivo.primitives import Artifact, ArtifactType, StartInput, StartOutput\n\n\n@perceivo.start\nasync def intake(input: StartInput) -> StartOutput:\n    \"\"\"Read the two inputs, check them, and pass them to the expert.\"\"\"\n    profession = input.request_data.get(\"profession\", \"\").strip()\n    question = input.request_data.get(\"question\", \"\").strip()\n\n    if not profession or not question:\n        raise ValueError(\"Both 'profession' and 'question' are required.\")\n\n    perceivo.log.info(\"Intake received a question\", profession=profession)\n\n    return StartOutput(\n        artifact=Artifact(type=ArtifactType.TEXT, data=question),\n        response_data={\"profession\": profession, \"question\": question},\n    )\n",
+      "manifest_yaml": "extension_type: START\nname: Intake\ndescription: Takes a profession and a question and hands both to the expert.\ntags:\n  - beginner\n  - start\nexternal_in_port:\n  port_name: external_in\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: text\n  request_data:\n    profession:\n      type: string\n      description: Who should answer, for example \"structural engineer\".\n    question:\n      type: string\n      description: The question to ask that expert.\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_input: json\n    artifact_type_output: text\n    response_data:\n      profession:\n        type: string\n        description: The profession, forwarded unchanged.\n      question:\n        type: string\n        description: The question, forwarded unchanged.\ninput_parameters: []\ninput_prompt: Name a profession and ask that expert a question.\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "external_in",
+          "label": null,
+          "port_type": "external_in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "profession": {
+              "type": "string",
+              "description": "Who should answer, for example \"structural engineer\"."
+            },
+            "question": {
+              "type": "string",
+              "description": "The question to ask that expert."
+            }
+          },
+          "response_data_schema": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "text",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "OUT",
+          "key": "output",
+          "label": null,
+          "port_type": "out",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "profession": {
+              "type": "string",
+              "description": "The profession, forwarded unchanged."
+            },
+            "question": {
+              "type": "string",
+              "description": "The question, forwarded unchanged."
+            }
+          },
+          "artifact_type_input": "json",
+          "artifact_type_output": "text",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_1": {
+      "asset_id": null,
+      "name": "Expert",
+      "category": "AGENT",
+      "description": "Answers the question in the voice of the requested profession, using ChatGPT.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "agent",
+        "openai"
+      ],
+      "config": {
+        "required_secrets": [
+          {
+            "name": "OPENAI_API_KEY",
+            "label": "OpenAI API key",
+            "description": "Your OpenAI API key. The agent reads it at run time; it is never stored in the component.",
+            "required": true
+          }
+        ]
+      },
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import httpx\nimport perceivo\nfrom perceivo.log.conversation import ContentPart, ConversationMessage\nfrom perceivo.primitives import AgentInput, AgentOutput, Artifact, ArtifactType\n\nOPENAI_URL = \"https://api.openai.com/v1/chat/completions\"\nMODEL = \"gpt-4o-mini\"\n\n\nasync def ask_chatgpt(api_key: str, system_prompt: str, question: str) -> dict:\n    \"\"\"Send one question to ChatGPT and return the reply with its token counts.\"\"\"\n    async with httpx.AsyncClient(timeout=60) as client:\n        response = await client.post(\n            OPENAI_URL,\n            headers={\"Authorization\": f\"Bearer {api_key}\"},\n            json={\n                \"model\": MODEL,\n                \"messages\": [\n                    {\"role\": \"system\", \"content\": system_prompt},\n                    {\"role\": \"user\", \"content\": question},\n                ],\n            },\n        )\n        response.raise_for_status()\n        body = response.json()\n\n    return {\n        \"answer\": body[\"choices\"][0][\"message\"][\"content\"],\n        \"model\": body[\"model\"],\n        \"tokens_in\": body[\"usage\"][\"prompt_tokens\"],\n        \"tokens_out\": body[\"usage\"][\"completion_tokens\"],\n    }\n\n\n@perceivo.agent\nasync def expert(input: AgentInput) -> AgentOutput:\n    \"\"\"Answer the question as the requested professional.\"\"\"\n    # 1. Read the request data the start component sent.\n    profession = input.request_data[\"profession\"]\n    question = input.request_data[\"question\"]\n\n    # 2. Read the secret declared in expert.yaml.\n    api_key = await perceivo.secrets.get(\"OPENAI_API_KEY\")\n\n    # 3. Fill the system prompt from the request data, then call ChatGPT.\n    system_prompt = (\n        f\"You are an experienced {profession}. \"\n        \"Answer the question the way you would explain it to a client: \"\n        \"plainly, accurately and in under 150 words.\"\n    )\n    result = await ask_chatgpt(api_key, system_prompt, question)\n    perceivo.log.info(\"Expert answered\", model=result[\"model\"], tokens_out=result[\"tokens_out\"])\n\n    # 4. Return two things: the reply as response data, and an entry for the conversation log.\n    return AgentOutput(\n        artifact=Artifact(type=ArtifactType.TEXT, data=result[\"answer\"]),\n        response_data={\n            \"answer\": result[\"answer\"],\n            \"model\": result[\"model\"],\n            \"provider\": \"openai\",\n            \"tokens_in\": result[\"tokens_in\"],\n            \"tokens_out\": result[\"tokens_out\"],\n        },\n        conversation_log=ConversationMessage(\n            role=\"agent\",\n            parts=[\n                ContentPart(\"text/plain\", f\"Answered as a {profession}.\", name=\"summary\"),\n                ContentPart(\"text/plain\", result[\"answer\"], name=\"response\"),\n            ],\n            metadata={\n                \"model\": result[\"model\"],\n                \"tokens_in\": result[\"tokens_in\"],\n                \"tokens_out\": result[\"tokens_out\"],\n            },\n        ),\n    )\n",
+      "manifest_yaml": "extension_type: AGENT\nname: Expert\ndescription: Answers the question in the voice of the requested profession, using ChatGPT.\ntags:\n  - beginner\n  - agent\n  - openai\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: text\n    artifact_type_output: text\n    request_data:\n      profession:\n        type: string\n        description: The profession the expert speaks as.\n      question:\n        type: string\n        description: The question to answer.\n    response_data:\n      answer:\n        type: string\n        description: The expert's reply.\n      model:\n        type: string\n        description: The model that wrote the reply.\n      provider:\n        type: string\n        description: The model provider (openai).\n      tokens_in:\n        type: integer\n        description: Prompt tokens the call used.\n      tokens_out:\n        type: integer\n        description: Completion tokens the call used.\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: text\n  artifact_type_output: text\n  response_data:\n    answer:\n      type: string\n      description: The expert's reply.\n    model:\n      type: string\n      description: The model that wrote the reply.\n    provider:\n      type: string\n      description: The model provider (openai).\n    tokens_in:\n      type: integer\n      description: Prompt tokens the call used.\n    tokens_out:\n      type: integer\n      description: Completion tokens the call used.\ninput_parameters: []\nrequired_secrets:\n  - name: OPENAI_API_KEY\n    label: OpenAI API key\n    description: Your OpenAI API key. The agent reads it at run time; it is never stored in the component.\n    required: true\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "profession": {
+              "type": "string",
+              "description": "The profession the expert speaks as."
+            },
+            "question": {
+              "type": "string",
+              "description": "The question to answer."
+            }
+          },
+          "response_data_schema": {
+            "answer": {
+              "type": "string",
+              "description": "The expert's reply."
+            },
+            "model": {
+              "type": "string",
+              "description": "The model that wrote the reply."
+            },
+            "provider": {
+              "type": "string",
+              "description": "The model provider (openai)."
+            },
+            "tokens_in": {
+              "type": "integer",
+              "description": "Prompt tokens the call used."
+            },
+            "tokens_out": {
+              "type": "integer",
+              "description": "Completion tokens the call used."
+            }
+          },
+          "artifact_type_input": "text",
+          "artifact_type_output": "text",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_2": {
+      "asset_id": null,
+      "name": "Reply",
+      "category": "END",
+      "description": "Returns the expert's answer with the model used and the token counts.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "end"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import perceivo\nfrom perceivo.primitives import EndInput, EndOutput\n\n\n@perceivo.end\nasync def reply(input: EndInput) -> EndOutput:\n    \"\"\"Return the answer, the model and the token counts to the caller.\"\"\"\n    tokens_in = input.response_data.get(\"tokens_in\", 0)\n    tokens_out = input.response_data.get(\"tokens_out\", 0)\n\n    return EndOutput(\n        artifact=input.artifact,\n        response_data={\n            \"answer\": input.response_data.get(\"answer\", \"\"),\n            \"model\": input.response_data.get(\"model\", \"\"),\n            \"tokens_in\": tokens_in,\n            \"tokens_out\": tokens_out,\n            \"total_tokens\": tokens_in + tokens_out,\n        },\n    )\n",
+      "manifest_yaml": "extension_type: END\nname: Reply\ndescription: Returns the expert's answer with the model used and the token counts.\ntags:\n  - beginner\n  - end\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: text\n    request_data:\n      answer:\n        type: string\n        description: The expert's reply.\n      model:\n        type: string\n        description: The model that wrote the reply.\n      provider:\n        type: string\n        description: The model provider.\n      tokens_in:\n        type: integer\n        description: Prompt tokens the call used.\n      tokens_out:\n        type: integer\n        description: Completion tokens the call used.\nexternal_out_port:\n  port_name: external_out\n  port_type: external_out\n  artifact_type_input: text\n  response_data:\n    answer:\n      type: string\n      description: The expert's reply.\n    model:\n      type: string\n      description: The model that wrote the reply.\n    tokens_in:\n      type: integer\n      description: Prompt tokens the call used.\n    tokens_out:\n      type: integer\n      description: Completion tokens the call used.\n    total_tokens:\n      type: integer\n      description: tokens_in plus tokens_out.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "OUT",
+          "key": "external_out",
+          "label": null,
+          "port_type": "external_out",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "answer": {
+              "type": "string",
+              "description": "The expert's reply."
+            },
+            "model": {
+              "type": "string",
+              "description": "The model that wrote the reply."
+            },
+            "tokens_in": {
+              "type": "integer",
+              "description": "Prompt tokens the call used."
+            },
+            "tokens_out": {
+              "type": "integer",
+              "description": "Completion tokens the call used."
+            },
+            "total_tokens": {
+              "type": "integer",
+              "description": "tokens_in plus tokens_out."
+            }
+          },
+          "artifact_type_input": "text",
+          "artifact_type_output": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "answer": {
+              "type": "string",
+              "description": "The expert's reply."
+            },
+            "model": {
+              "type": "string",
+              "description": "The model that wrote the reply."
+            },
+            "provider": {
+              "type": "string",
+              "description": "The model provider."
+            },
+            "tokens_in": {
+              "type": "integer",
+              "description": "Prompt tokens the call used."
+            },
+            "tokens_out": {
+              "type": "integer",
+              "description": "Completion tokens the call used."
+            }
+          },
+          "response_data_schema": null,
+          "artifact_type_input": "text",
+          "artifact_type_output": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    }
+  },
+  "nodes": [
+    {
+      "local_id": "node_intake",
+      "component_ref": "comp_0",
+      "component_asset_id": null,
+      "name": "Intake",
+      "position": {
+        "x": 60,
+        "y": 200
+      },
+      "config": null
+    },
+    {
+      "local_id": "node_expert",
+      "component_ref": "comp_1",
+      "component_asset_id": null,
+      "name": "Expert",
+      "position": {
+        "x": 360,
+        "y": 200
+      },
+      "config": {
+        "mainflow_target_node_ref": "node_reply"
+      }
+    },
+    {
+      "local_id": "node_reply",
+      "component_ref": "comp_2",
+      "component_asset_id": null,
+      "name": "Reply",
+      "position": {
+        "x": 660,
+        "y": 200
+      },
+      "config": null
+    }
+  ],
+  "ports": [
+    {
+      "node_ref": "node_intake",
+      "component_port_key": "external_in",
+      "component_port_direction": "IN",
+      "alias": "external_in",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_intake",
+      "component_port_key": "output",
+      "component_port_direction": "OUT",
+      "alias": "output",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_expert",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_reply",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_reply",
+      "component_port_key": "external_out",
+      "component_port_direction": "OUT",
+      "alias": "external_out",
+      "effective_contract": null
+    }
+  ],
+  "edges": [
+    {
+      "source_port_index": 1,
+      "target_port_index": 2,
+      "edge_kind": "MAINFLOW"
+    }
+  ],
+  "secrets_required": []
+}

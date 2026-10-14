@@ -1,0 +1,33 @@
+extension_type: START
+name: Work Order
+description: Takes the product to build and how long each stage should take.
+tags:
+  - beginner
+  - start
+external_in_port:
+  port_name: external_in
+  port_type: external_in
+  artifact_type_input: json
+  artifact_type_output: none
+  request_data:
+    product:
+      type: string
+      description: What the line should make, for example "bicycle frame".
+    seconds_per_stage:
+      type: integer
+      description: How long each of the four stages works, 1 to 30 seconds.
+output_ports:
+  - port_name: output
+    port_type: out
+    artifact_type_input: json
+    artifact_type_output: none
+    response_data:
+      product:
+        type: string
+        description: What the line should make.
+      seconds_per_stage:
+        type: integer
+        description: How long each stage works.
+input_parameters: []
+input_prompt: Name a product and how many seconds each stage should take.
+required_secrets: []

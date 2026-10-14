@@ -1,0 +1,608 @@
+{
+  "components": {
+    "comp_0": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "578faa53-4674-4c5f-8be1-e4794c580cdf",
+      "category": "END",
+      "config": {
+        "detected_endpoints": [],
+        "is_generic_end": true,
+        "output_parameters": {
+          "declarations": [],
+          "values": {}
+        },
+        "port_order": [
+          "input",
+          "external_output"
+        ]
+      },
+      "description": "What it does The exit of the Conditional Router template. It returns whatever the chosen branch produced.\n\nHow it works Takes the data reaching it from the branch that ran and returns it as the result of the nested run, so the parent flow continues with it. It adds nothing of its own.\n\nConfigure Nothing.\n\nIn and out In: the output of the branch that ran. Out: the same data, as the template's result.\n\nUse it when It comes with the Conditional Router template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: json\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: json\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\n",
+      "name": "CONDITIONAL ROUTER - END (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "external_output",
+          "label": "External Output",
+          "multi_artifact": false,
+          "port_type": "external_out",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.end\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data=input.response_data or {},\n    )\n",
+      "short_description": "The exit of the Conditional Router template. It returns whatever the chosen branch produced.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_1": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "64308145-155e-4bd6-934b-2aa0ce9716c1",
+      "category": "FSM",
+      "config": {
+        "detected_endpoints": [],
+        "fsm": {
+          "max_steps": 1
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "default": "[]",
+              "description": "JSON array of branch conditions. Managed by the Branch Editor UI.",
+              "label": "Branch Configuration",
+              "name": "branches",
+              "required": false,
+              "type": "text_long"
+            },
+            {
+              "default": "",
+              "description": "Port name to invoke when no conditions match.",
+              "label": "Default Branch",
+              "name": "default_branch",
+              "type": "text"
+            }
+          ],
+          "values": {
+            "branches": "[{\"port_name\":\"branch_1\",\"field\":\"max_length\",\"operator\":\"less_than_or_equal\",\"value\":\"199\"},{\"port_name\":\"branch_2\",\"field\":\"max_length\",\"operator\":\"greater_than_or_equal\",\"value\":\"200\"}]",
+            "default_branch": ""
+          }
+        },
+        "is_conditional_router": true,
+        "port_order": [
+          "input",
+          "branch_1",
+          "branch_2",
+          "policy"
+        ],
+        "port_sides": {
+          "branch_1": "bottom",
+          "branch_2": "bottom",
+          "input": "left",
+          "policy": "top"
+        }
+      },
+      "description": "What it does The engine of the Conditional Router template. It holds the branches and selects the one to run.\n\nHow it works Each branch slot holds one component and carries a condition. The FSM asks its policy to evaluate the conditions against the current data, then runs only the branch that was chosen. If nothing matches, the default branch runs.\n\nConfigure\n- Branches - the branch slots, each with the field, operator and value that select it.\n- Default branch - the branch taken when no condition matches. Point this at something that\nhandles the unexpected; it is the fail-safe path.\n\nIn and out In: the data the decision is made on. Out: the output of the branch that ran.\n\nUse it when It comes with the Conditional Router template - configure it there rather than adding it on its own.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: fsm\nname: Conditional Router\ndescription: >\n  Control-flow FSM. Delegates the routing decision to its policy, then invokes\n  exactly one branch slot and republishes that branch's response_data.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The generic start forwards whatever artifact the caller supplied, which may\n    # be nothing, so its output port declares `optional(json)` and this input has\n    # to accept the same. The script holds the inbound artifact in a guarded local\n    # so the declaration is true (VAL-CONTRACT-OPTIONAL-001). Mainflow continuity\n    # IS contract-validated: it is synthesized from `mainflow_target_node_ref`\n    # rather than stored in `spec.edges`, but the gate sees it either way.\n    artifact_type_input: optional(json)\n    artifact_type_output: json\n    response_data:\n      routed_to: string - The branch port name the policy selected.\n      match_reason: string - Human-readable reason that branch matched.\n      branch_response: object (optional) - response_data returned by the invoked branch.\n\nstate_ports:\n  - port_name: branch_1\n    artifact_type_input: json\n    artifact_type_output: json\n  - port_name: branch_2\n    artifact_type_input: json\n    artifact_type_output: json\n\npolicy_ports:\n  - port_name: policy\n    artifact_type_input: none\n    artifact_type_output: none\n    response_data:\n      next_state: string - The branch port name to route to.\n      match_reason: string - Human-readable reason the branch matched.\n\ninput_parameters:\n  - name: branches\n    type: text_long\n    label: Branch Conditions\n    default: \"[]\"\n    description: >\n      JSON array of routing rules. Each entry is\n      {\"port_name\", \"field\", \"operator\", \"value\"} and the first match wins.\n  - name: default_branch\n    type: text\n    label: Default Branch\n    default: branch_1\n    description: Branch port to use when no condition matches.\n",
+      "name": "CONDITIONAL ROUTER - FSM (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "branch_response": {
+              "required": false,
+              "type": "object"
+            },
+            "match_reason": {
+              "required": true,
+              "type": "string"
+            },
+            "routed_to": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "branch_1",
+          "label": "Branch 1",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "branch_2",
+          "label": "Branch 2",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "policy",
+          "label": "Policy",
+          "multi_artifact": false,
+          "port_type": "policy",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "match_reason": {
+              "required": true,
+              "type": "string"
+            },
+            "next_state": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\nimport json as _json\n\n\n@perceivo.fsm\nasync def conditional_router_prebuilt(input: perceivo.primitives.FsmInput) -> perceivo.primitives.FsmOutput:\n    # Read branch configuration from input parameters\n    branches_raw = perceivo.params.get(\"branches\", \"[]\")\n    if isinstance(branches_raw, str):\n        branches = _json.loads(branches_raw)\n    else:\n        branches = branches_raw if isinstance(branches_raw, list) else []\n\n    default_branch = perceivo.params.get(\"default_branch\", \"\")\n\n    # Get data to evaluate conditions against\n    data = input.request_data or {}\n    if not data and input.artifact and isinstance(input.artifact.data, dict):\n        data = input.artifact.data\n\n    perceivo.log.info(\n        f\"Routing with {len(branches)} branch conditions\",\n        default_branch=default_branch,\n        data_keys=list(data.keys()) if isinstance(data, dict) else [],\n    )\n\n    # Delegate routing decision to policy\n    policy_result = await perceivo.flow.invoke(\n        port_name=\"policy\",\n        request_data={\n            \"data\": data,\n            \"branches\": branches,\n            \"default_branch\": default_branch,\n        }\n    )\n\n    # Extract policy decision\n    policy_response = policy_result.get(\"response_data\", {}) if isinstance(policy_result, dict) else {}\n    next_state = policy_response.get(\"next_state\", default_branch)\n    match_reason = policy_response.get(\"match_reason\", \"policy decision\")\n\n    # Fail-closed: if no branch condition matched and no explicit\n    # default_branch was configured, refuse to route rather than silently\n    # falling through to branch_1. A user can still set default_branch to opt\n    # into a fallback route.\n    if not next_state:\n        raise ValueError(\n            \"Conditional Router: no branch condition matched and no \"\n            \"default_branch is configured; failing closed. Set an explicit \"\n            \"default_branch to enable a fallback route.\"\n        )\n\n    perceivo.log.info(f\"Policy decided: {next_state} ({match_reason})\")\n\n    # Invoke the selected branch, forwarding the input artifact\n    result = await perceivo.flow.invoke(\n        port_name=next_state,\n        request_data=data,\n        artifact=input.artifact,\n    )\n\n    # Extract artifact from branch result.\n    # WORKAROUND: _format_invoke_result drops perceivo.primitives.Artifact objects because\n    # it isinstance-checks against app.schemas.run_schemas.Artifact (different class).\n    # So result[\"artifact\"] is always None for branch invokes. Instead, reconstruct\n    # the artifact from response_data which IS propagated correctly.\n    result_artifact = None\n    if input.artifact:\n        result_artifact = input.artifact\n    if result and isinstance(result, dict):\n        art = result.get(\"artifact\")\n        if art is not None and hasattr(art, \"data\") and hasattr(art, \"type\"):\n            # Got an actual Artifact object (would work once platform bug is fixed)\n            result_artifact = perceivo.primitives.Artifact(\n                type=art.type if isinstance(art.type, str) else art.type.value,\n                data=art.data,\n                mime_type=getattr(art, \"mime_type\", \"text/plain\"),\n            )\n        elif result.get(\"response_data\"):\n            # Reconstruct artifact from response_data (workaround for platform bug)\n            result_artifact = perceivo.primitives.Artifact(\n                type=perceivo.primitives.ArtifactType.JSON,\n                data=result[\"response_data\"],\n                mime_type=\"application/json\",\n            )\n\n    return perceivo.primitives.FsmOutput(\n        artifact=result_artifact,\n        response_data={\n            \"routed_to\": next_state,\n            \"match_reason\": match_reason,\n            \"branch_response\": result.get(\"response_data\") if isinstance(result, dict) else None,\n        }\n    )\n",
+      "short_description": "The engine of the Conditional Router template. It holds the branches and selects the one to",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_2": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "75a87b94-f5bf-45c1-9c2e-e82c04cd1ea3",
+      "category": "POLICY",
+      "config": {
+        "detected_endpoints": [],
+        "is_agent_tool_internal": true
+      },
+      "description": "What it does The decision rule for the Conditional Router: it reads the data and names the branch to take.\n\nHow it works Evaluates each configured condition against the current data in order and returns the first branch that matches, or the default branch when none do. It makes no calls of its own and holds no configuration - the branches and conditions live on the FSM.\n\nConfigure Nothing. Set the branches and the default on the FSM instead.\n\nIn and out In: the run data and the configured branch conditions. Out: the name of the branch to run.\n\nUse it when It comes with the Conditional Router template. You do not add or configure it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: policy\nname: Conditional Router Policy\ndescription: >\n  Internal routing policy for the Conditional Router. Evaluates the configured\n  branch conditions in order and names the first branch that matches.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      data: object (optional) - The payload to test the conditions against.\n      branches: array (optional) - Ordered field/operator/value rules.\n      default_branch: string (optional) - Branch to use when nothing matches.\n    response_data:\n      next_state: string - The branch port name that won.\n      match_reason: string - Why it won, or a note that the default was used.\n\npolicy_states:\n  - branch_1\n  - branch_2\n",
+      "name": "CONDITIONAL ROUTER - POLICY (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "branches": {
+              "required": false,
+              "type": "array"
+            },
+            "data": {
+              "required": false,
+              "type": "object"
+            },
+            "default_branch": {
+              "required": false,
+              "type": "string"
+            }
+          },
+          "response_data_schema": {
+            "match_reason": {
+              "required": true,
+              "type": "string"
+            },
+            "next_state": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\ndef _evaluate(actual, operator, expected):\n    \"\"\"Evaluate a single condition.\"\"\"\n    if actual is None:\n        return False\n\n    actual_str = str(actual)\n    expected_str = str(expected)\n\n    if operator == \"equals\":\n        return actual_str.lower() == expected_str.lower()\n    elif operator == \"not_equals\":\n        return actual_str.lower() != expected_str.lower()\n    elif operator == \"contains\":\n        return expected_str.lower() in actual_str.lower()\n    elif operator == \"starts_with\":\n        return actual_str.lower().startswith(expected_str.lower())\n    elif operator == \"greater_than\":\n        try:\n            return float(actual) > float(expected)\n        except (ValueError, TypeError):\n            return False\n    elif operator == \"greater_than_or_equal\":\n        try:\n            return float(actual) >= float(expected)\n        except (ValueError, TypeError):\n            return False\n    elif operator == \"less_than\":\n        try:\n            return float(actual) < float(expected)\n        except (ValueError, TypeError):\n            return False\n    elif operator == \"less_than_or_equal\":\n        try:\n            return float(actual) <= float(expected)\n        except (ValueError, TypeError):\n            return False\n    else:\n        perceivo.log.warning(f\"Unknown operator: {operator}, treating as no match\")\n        return False\n\n\n\n@perceivo.policy\nasync def conditional_router_policy_internal(input: perceivo.primitives.PolicyInput) -> perceivo.primitives.PolicyOutput:\n    request_data = input.request_data or {}\n\n    # Branch config is passed from the Layer in request_data\n    branches = request_data.get(\"branches\", [])\n    default_branch = request_data.get(\"default_branch\", \"\")\n    data = request_data.get(\"data\", {})\n\n    perceivo.log.info(\n        f\"Evaluating {len(branches)} conditions\",\n        default_branch=default_branch,\n        data_keys=list(data.keys()) if isinstance(data, dict) else [],\n    )\n\n    # Evaluate conditions in order -- first match wins\n    target = default_branch\n    match_reason = \"default (no conditions matched)\"\n    matched = False\n\n    for branch in branches:\n        port_name = branch.get(\"port_name\", \"\")\n        field = branch.get(\"field\", \"\")\n        operator = branch.get(\"operator\", \"equals\")\n        expected = branch.get(\"value\", \"\")\n\n        actual = data.get(field) if isinstance(data, dict) else None\n\n        if _evaluate(actual, operator, expected):\n            target = port_name\n            match_reason = f\"{field} {operator} {expected}\"\n            matched = True\n            perceivo.log.info(f\"Condition matched: {match_reason} -> {target}\")\n            break\n\n    # Fail-closed: if nothing matched and no explicit default_branch\n    # was configured, refuse to route rather than silently falling through to\n    # branch_1. A user can still set default_branch to opt into a fallback.\n    if not matched and not default_branch:\n        raise ValueError(\n            \"Conditional Router: no branch condition matched and no \"\n            \"default_branch is configured; failing closed. Set an explicit \"\n            \"default_branch to enable a fallback route.\"\n        )\n\n    perceivo.log.info(f\"Decision: route to {target} ({match_reason})\")\n\n    return perceivo.primitives.PolicyOutput(\n        next_state=target,\n        response_data={\n            \"next_state\": target,\n            \"match_reason\": match_reason,\n        }\n    )\n",
+      "short_description": "The decision rule for the Conditional Router: it reads the data and names the branch to take.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_3": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "9ea566bf-677d-4a8a-8d0f-308280a2a5dc",
+      "category": "START",
+      "config": {
+        "detected_endpoints": [],
+        "input_parameters": {
+          "declarations": [
+            {
+              "_schema_type": "string",
+              "label": "prompt",
+              "name": "prompt",
+              "required": true,
+              "type": "text"
+            }
+          ],
+          "values": {}
+        },
+        "is_generic_start": true,
+        "port_order": [
+          "external_input",
+          "output"
+        ]
+      },
+      "description": "What it does The entry point of the Conditional Router template. It accepts the data the routing decision will be made on.\n\nHow it works Passes the incoming data and any accompanying file straight through to the router, adding nothing.\n\nConfigure Nothing.\n\nIn and out In: the caller's request. Out: the same, unchanged, into the router.\n\nUse it when It comes with the Conditional Router template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+      "name": "CONDITIONAL ROUTER - START (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "external_input",
+          "label": "External Input",
+          "multi_artifact": false,
+          "port_type": "external_in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "output",
+          "label": "Output",
+          "multi_artifact": false,
+          "port_type": "out",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.start\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    return perceivo.primitives.StartOutput(\n        artifact=input.artifact,\n        response_data=input.request_data or {},\n    )\n",
+      "short_description": "The entry point of the Conditional Router template. It accepts the data the routing decision",
+      "tags": [],
+      "template_source_id": null
+    }
+  },
+  "edges": [
+    {
+      "edge_kind": "MAINFLOW",
+      "source_port_index": 0,
+      "target_port_index": 1
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 2,
+      "target_port_index": 3
+    }
+  ],
+  "export_type": "orchestration",
+  "export_version": "1.0",
+  "exported_at": "2026-07-18T02:12:21.876296Z",
+  "nodes": [
+    {
+      "component_asset_id": "75a87b94-f5bf-45c1-9c2e-e82c04cd1ea3",
+      "component_ref": "comp_2",
+      "config": {
+        "port_sides": {
+          "": "top"
+        }
+      },
+      "local_id": "node_0",
+      "name": "Conditional Router Policy",
+      "position": {
+        "x": 326.0,
+        "y": 430.0
+      }
+    },
+    {
+      "component_asset_id": "64308145-155e-4bd6-934b-2aa0ce9716c1",
+      "component_ref": "comp_1",
+      "config": {
+        "_mainflow_target_node_ref": "end",
+        "mainflow_target_node_ref": "node_3",
+        "port_sides": {
+          "": "left"
+        }
+      },
+      "local_id": "node_1",
+      "name": "Conditional Router",
+      "position": {
+        "x": 326.0,
+        "y": 220.0
+      }
+    },
+    {
+      "component_asset_id": "9ea566bf-677d-4a8a-8d0f-308280a2a5dc",
+      "component_ref": "comp_3",
+      "config": {},
+      "local_id": "node_2",
+      "name": "Conditional Router - Start",
+      "position": {
+        "x": 50.0,
+        "y": 236.0
+      }
+    },
+    {
+      "component_asset_id": "578faa53-4674-4c5f-8be1-e4794c580cdf",
+      "component_ref": "comp_0",
+      "config": {},
+      "local_id": "node_3",
+      "name": "Conditional Router - End",
+      "position": {
+        "x": 710.0,
+        "y": 36.0
+      }
+    }
+  ],
+  "orchestration": {
+    "additional_packages": [],
+    "description": "What it does Sends the flow down exactly one of several branches, based on the data. It is the if/else of an orchestration.\n\nHow it works Wire a component into each branch slot and describe the conditions that select each one. At run time it tests the data against those conditions in order and runs the first branch that matches; if none match it takes the default branch. Only the chosen branch runs, so the branches you did not take cost nothing.\n\nConfigure (on the FSM component inside)\n- Branches - the branch slots and the condition that selects each. A condition names a field,\nan operator and a value to compare against.\n- Default branch - which branch runs when nothing matches. This is the fail-safe, so it is\nworth pointing at something that handles the unexpected rather than the happy path.\n\nIn and out In: the data the decision is made on. Out: whatever the branch that ran produced.\n\nUse it when\n- Different kinds of request need different handling.\n- A quality or safety check upstream should decide what happens next.\n- You want one flow to serve several cases instead of maintaining several flows.",
+    "disable_intermediate_snapshots": false,
+    "name": "CONDITIONAL ROUTER (SYSTEM, READ-ONLY)",
+    "requires_gpu": false,
+    "runtime_config": null,
+    "tags": []
+  },
+  "ports": [
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "output",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "policy",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_0"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "external_input",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "external_output",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    }
+  ],
+  "secrets_required": []
+}

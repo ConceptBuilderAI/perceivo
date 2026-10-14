@@ -1,0 +1,272 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "MILVUS (SYSTEM, READ-ONLY)",
+    "category": "AGENT",
+    "description": "What it does Stores embedding vectors in your organization's Milvus vector database and finds the closest ones again - the retrieval half of retrieval-augmented generation, semantic search and recommendations.\n\nHow it works Each node runs one operation, chosen in the Inspector. INSERT and SEARCH read the vectors from the incoming data at the path Embeddings Field names - one vector or a list of them, usually straight from an embedding node - and INSERT stores each vector's text and metadata with it. SEARCH returns the closest matches with their distance, text and metadata. The collection name and filter can be filled from the incoming data with ${field} placeholders. A Milvus error fails the run, so vectors are never counted as stored when they are not. Anything else arriving passes through to the next node.\n\nConfigure\n- Operation - CREATE_COLLECTION, INSERT, SEARCH, DELETE, LIST_COLLECTIONS or DROP_COLLECTION.\n- Collection Name - the collection to act on.\n- Embeddings Field and Texts Field - where the vectors and their texts are in the incoming data.\n- Vector Dimension and Distance Metric - set once, when the collection is created.\n- Top K Results - the most matches SEARCH returns per vector.\n- Filter Expression - narrows SEARCH, or picks what DELETE removes, such as metadata[\"source\"] == \"faq\".\n\nIn and out In: embeddings, plus texts and metadata for INSERT; ids or a filter for DELETE. Out: the incoming data without the raw vectors, plus the operation, the collection and its result - insert_count and inserted_ids, sources, deleted or collections.\n\nUse it when\n- You want an assistant to answer from your own documents.\n- You need \"find similar\" over products, tickets or images.\n- An orchestration should build or refresh a vector index as part of a pipeline.",
+    "short_description": "Stores embedding vectors in your organization's Milvus and searches them by similarity.",
+    "tags": [
+      "template",
+      "vector-db",
+      "milvus"
+    ],
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "hard-drive"
+      },
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "left"
+      },
+      "input_parameters": {
+        "values": {
+          "operation": "SEARCH",
+          "collection_name": "",
+          "embeddings_field": "${embeddings}",
+          "texts_field": "${texts}",
+          "dimension": 1536,
+          "metric_type": "COSINE",
+          "top_k": 10,
+          "filter_expr": ""
+        },
+        "declarations": [
+          {
+            "name": "operation",
+            "type": "select",
+            "label": "Operation",
+            "options": [
+              "CREATE_COLLECTION",
+              "INSERT",
+              "SEARCH",
+              "DELETE",
+              "LIST_COLLECTIONS",
+              "DROP_COLLECTION"
+            ],
+            "default": "SEARCH",
+            "required": true,
+            "description": "The Milvus operation this node runs."
+          },
+          {
+            "name": "collection_name",
+            "type": "text",
+            "label": "Collection Name",
+            "default": "",
+            "description": "The collection to act on. Accepts ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "CREATE_COLLECTION",
+                "INSERT",
+                "SEARCH",
+                "DELETE",
+                "DROP_COLLECTION"
+              ]
+            }
+          },
+          {
+            "name": "embeddings_field",
+            "type": "text",
+            "label": "Embeddings Field",
+            "default": "${embeddings}",
+            "description": "A ${path} reference to the vector, or list of vectors, in the incoming data.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "INSERT",
+                "SEARCH"
+              ]
+            }
+          },
+          {
+            "name": "texts_field",
+            "type": "text",
+            "label": "Texts Field",
+            "default": "${texts}",
+            "description": "A ${path} reference to the texts stored with the vectors, one per vector. Optional in the data.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "INSERT"
+              ]
+            }
+          },
+          {
+            "name": "dimension",
+            "type": "integer",
+            "label": "Vector Dimension",
+            "default": 1536,
+            "constraints": {
+              "min": 1,
+              "max": 32768
+            },
+            "description": "The length of every vector the collection will hold; it must match your embedding model.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "CREATE_COLLECTION"
+              ]
+            }
+          },
+          {
+            "name": "metric_type",
+            "type": "select",
+            "label": "Distance Metric",
+            "options": [
+              "COSINE",
+              "L2",
+              "IP"
+            ],
+            "default": "COSINE",
+            "description": "How similarity is measured. Set once when the collection is created; searches use it.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "CREATE_COLLECTION"
+              ]
+            }
+          },
+          {
+            "name": "top_k",
+            "type": "integer",
+            "label": "Top K Results",
+            "default": 10,
+            "constraints": {
+              "min": 1,
+              "max": 1000
+            },
+            "description": "The most matches SEARCH returns per query vector.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SEARCH"
+              ]
+            }
+          },
+          {
+            "name": "filter_expr",
+            "type": "text",
+            "label": "Filter Expression",
+            "default": "",
+            "description": "A Milvus filter expression that narrows SEARCH, or selects what DELETE removes. Accepts ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SEARCH",
+                "DELETE"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "optional(json)",
+    "artifact_type_output": "json",
+    "script": "\"\"\"Milvus -- store and search embedding vectors in the organization's Milvus.\n\nOne node runs one operation, chosen in the Inspector: CREATE_COLLECTION,\nINSERT, SEARCH, DELETE, LIST_COLLECTIONS or DROP_COLLECTION. The vectors and\ntexts come from the incoming request_data, at the paths the Embeddings Field\nand Texts Field name (${embeddings} by default). The collection name and filter\nexpression may contain ${field} placeholders.\n\nA misconfigured node raises ValueError before Milvus is touched, and a Milvus\nfailure raises from the client. Neither is caught: a vector that was not\nstored must fail the run, never be counted as inserted.\n\"\"\"\n\nimport json\nimport re\n\nimport perceivo\n\n# The fields each operation adds to response_data; the artifact carries exactly these.\n_RESULT_FIELDS = {\n    \"CREATE_COLLECTION\": (\"operation\", \"collection_name\"),\n    \"INSERT\": (\"operation\", \"collection_name\", \"insert_count\", \"inserted_ids\"),\n    \"SEARCH\": (\"operation\", \"collection_name\", \"sources\", \"collection_missing\"),\n    \"DELETE\": (\"operation\", \"collection_name\", \"deleted\"),\n    \"LIST_COLLECTIONS\": (\"operation\", \"collection_name\", \"collections\"),\n    \"DROP_COLLECTION\": (\"operation\", \"collection_name\"),\n}\n_METRICS = (\"COSINE\", \"L2\", \"IP\")\n_MAX_DIMENSION = 32768\n_MAX_TOP_K = 1000\n_PLACEHOLDER = re.compile(r\"\\$\\{([\\w.]+)\\}\")\n_REFERENCE = re.compile(r\"^\\$\\{([\\w.]+)\\}$\")\n\n\ndef _lookup(data, path: str):\n    \"\"\"Return (True, value) for a dotted path into data, or (False, None).\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if isinstance(value, dict) and part in value:\n            value = value[part]\n        elif isinstance(value, list) and part.isdigit() and int(part) < len(value):\n            value = value[int(part)]\n        else:\n            return False, None\n    return True, value\n\n\ndef _fill(label: str, template: str, data: dict) -> str:\n    \"\"\"Replace each ${path} in template with that value from data, raising on a missing field.\"\"\"\n\n    def _replace(match):\n        found, value = _lookup(data, match.group(1))\n        if not found:\n            raise ValueError(\n                f\"{label} refers to ${{{match.group(1)}}}, but the incoming data has no such field.\"\n            )\n        return value if isinstance(value, str) else json.dumps(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    value = perceivo.params.get(name, default)\n    return default if value is None else str(value)\n\n\ndef _bounded_int(name: str, label: str, default: int, low: int, high: int) -> int:\n    raw = perceivo.params.get(name, default)\n    try:\n        number = int(raw)\n    except (TypeError, ValueError):\n        raise ValueError(f\"{label} is {raw!r}. Use a whole number from {low} to {high}.\") from None\n    if not low <= number <= high:\n        raise ValueError(f\"{label} is {number}. Use a whole number from {low} to {high}.\")\n    return number\n\n\ndef _referenced(label: str, reference: str, data: dict, required: bool):\n    \"\"\"The object a whole ${path} parameter points at, or None when optional and absent.\"\"\"\n    match = _REFERENCE.match(reference.strip())\n    if not match:\n        raise ValueError(f\"{label} is {reference!r}. Use a ${{path}} reference into the incoming data.\")\n    found, value = _lookup(data, match.group(1))\n    if not found and required:\n        raise ValueError(f\"{label} refers to {reference}, but the incoming data has no such field.\")\n    return value if found else None\n\n\ndef _is_vector(value) -> bool:\n    return (\n        isinstance(value, list)\n        and bool(value)\n        and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in value)\n    )\n\n\ndef _vectors(value) -> tuple:\n    \"\"\"Return (vectors, single): one vector is wrapped into a batch of one.\"\"\"\n    if _is_vector(value):\n        return [value], True\n    if isinstance(value, list) and value and all(_is_vector(v) for v in value):\n        return value, False\n    raise ValueError(\"The embeddings must be one vector of numbers, or a list of such vectors.\")\n\n\ndef _aligned(name: str, value, count: int, single: bool, kind: type) -> list:\n    \"\"\"A per-vector list for texts or metadata; a lone item is accepted for a single vector.\"\"\"\n    if value is None:\n        return [kind() for _ in range(count)]\n    if single and isinstance(value, kind):\n        value = [value]\n    if not isinstance(value, list) or len(value) != count or not all(isinstance(v, kind) for v in value):\n        raise ValueError(\n            f\"{name} must be a list of {count} {kind.__name__} item(s), one per vector, or be left out.\"\n        )\n    return value\n\n\ndef _source(hit: dict) -> dict:\n    entity = hit.get(\"entity\") or {}\n    return {\n        \"id\": hit.get(\"id\"),\n        \"distance\": hit.get(\"distance\"),\n        \"text\": entity.get(\"text\", \"\"),\n        \"metadata\": entity.get(\"metadata\") or {},\n    }\n\n\n@perceivo.agent\nasync def milvus_agent(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Run one Milvus operation.\n\n    The JSON artifact carries the operation's result. response_data carries the\n    same fields on top of the incoming request_data, less the raw vector\n    payloads (embeddings, vectors, query_vectors), so downstream nodes keep\n    their context without carrying the vectors on.\n    \"\"\"\n    data = input.request_data or {}\n    if not isinstance(data, dict):\n        raise ValueError(f\"request_data must be an object, not {type(data).__name__}.\")\n\n    operation = _param(\"operation\", \"SEARCH\").strip().upper()\n    if operation not in _RESULT_FIELDS:\n        raise ValueError(f\"Operation is {operation!r}. Choose one of: {', '.join(_RESULT_FIELDS)}.\")\n\n    collection_name = _fill(\"Collection Name\", _param(\"collection_name\"), data).strip()\n    if not collection_name and operation != \"LIST_COLLECTIONS\":\n        raise ValueError(f\"Collection Name is empty. {operation} needs the collection to act on.\")\n\n    # Everything an operation needs is checked here, before the connection.\n    if operation == \"CREATE_COLLECTION\":\n        dimension = _bounded_int(\"dimension\", \"Vector Dimension\", 1536, 1, _MAX_DIMENSION)\n        metric_type = _param(\"metric_type\", \"COSINE\").strip().upper()\n        if metric_type not in _METRICS:\n            raise ValueError(f\"Distance Metric is {metric_type!r}. Choose one of: {', '.join(_METRICS)}.\")\n    elif operation in (\"INSERT\", \"SEARCH\"):\n        embeddings = _referenced(\"Embeddings Field\", _param(\"embeddings_field\", \"${embeddings}\"), data, True)\n        vectors, single = _vectors(embeddings)\n    if operation == \"INSERT\":\n        texts = _aligned(\n            \"texts\", _referenced(\"Texts Field\", _param(\"texts_field\", \"${texts}\"), data, False),\n            len(vectors), single, str,\n        )\n        metadata = _aligned(\"metadata\", data.get(\"metadata\"), len(vectors), single, dict)\n        rows = [{\"text\": text, \"metadata\": meta} for text, meta in zip(texts, metadata)]\n    elif operation == \"SEARCH\":\n        top_k = _bounded_int(\"top_k\", \"Top K Results\", 10, 1, _MAX_TOP_K)\n        filter_expr = _fill(\"Filter Expression\", _param(\"filter_expr\"), data).strip()\n    elif operation == \"DELETE\":\n        ids = data.get(\"ids\")\n        if ids is not None and (not isinstance(ids, list) or not ids):\n            raise ValueError(\"request_data.ids must be a non-empty list of ids, or be left out.\")\n        delete_filter = data.get(\"filter\") or _fill(\"Filter Expression\", _param(\"filter_expr\"), data).strip()\n        if not ids and not delete_filter:\n            raise ValueError(\"DELETE needs ids or a filter in request_data, or a Filter Expression.\")\n\n    # Forward the incoming data, less the raw vectors this node consumes.\n    passthrough = dict(data)\n    for consumed in (\"embeddings\", \"vectors\", \"query_vectors\"):\n        passthrough.pop(consumed, None)\n\n    milvus = await perceivo.cluster.milvus.connect()\n    perceivo.log.info(f\"Milvus: {operation}\", operation=operation, collection_name=collection_name)\n\n    if operation == \"CREATE_COLLECTION\":\n        await milvus.create_collection(name=collection_name, dimension=dimension, metric_type=metric_type)\n        result = {**passthrough, \"operation\": operation, \"collection_name\": collection_name}\n    elif operation == \"INSERT\":\n        returned = await milvus.insert(collection_name=collection_name, vectors=vectors, metadata=rows)\n        inserted = [str(i) for i in returned]\n        result = {\n            **passthrough,\n            \"operation\": operation,\n            \"collection_name\": collection_name,\n            \"insert_count\": len(inserted),\n            \"inserted_ids\": inserted,\n        }\n    elif operation == \"SEARCH\":\n        hits = await milvus.search(\n            collection_name=collection_name,\n            query_vectors=vectors,\n            top_k=top_k,\n            filter_expr=filter_expr or None,\n        )\n        # The service answers [] only when the collection does not exist.\n        per_query = [[_source(hit) for hit in query_hits] for query_hits in hits] or [[] for _ in vectors]\n        result = {\n            **passthrough,\n            \"operation\": operation,\n            \"collection_name\": collection_name,\n            \"sources\": per_query[0] if single else per_query,\n            \"collection_missing\": not hits,\n        }\n    elif operation == \"DELETE\":\n        if ids:\n            deleted = await milvus.delete(collection_name=collection_name, ids=[str(i) for i in ids])\n        else:\n            deleted = await milvus.delete(collection_name=collection_name, filter_expr=delete_filter)\n        result = {\n            **passthrough,\n            \"operation\": operation,\n            \"collection_name\": collection_name,\n            \"deleted\": int(deleted),\n        }\n    elif operation == \"LIST_COLLECTIONS\":\n        collections = sorted(await milvus.list_collections())\n        result = {\n            **passthrough,\n            \"operation\": operation,\n            \"collection_name\": collection_name,\n            \"collections\": collections,\n        }\n    else:\n        await milvus.drop_collection(name=collection_name)\n        result = {**passthrough, \"operation\": operation, \"collection_name\": collection_name}\n\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data={field: result[field] for field in _RESULT_FIELDS[operation]},\n            mime_type=\"application/json\",\n        ),\n        response_data=result,\n    )\n",
+    "manifest_yaml": "extension_type: agent\nname: Milvus\ndescription: >\n  Runs one operation against the organization's Milvus vector database -\n  create a collection, insert vectors with their texts, search by similarity,\n  delete, list collections or drop a collection. Vectors and texts are read\n  from request_data at the configured ${path}. A misconfigured node or a Milvus\n  failure raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The script never reads input.artifact; it always builds its own JSON\n    # result. optional(json) - \"a json, or nothing\" - keeps it chainable after\n    # any artifact-producing node.\n    artifact_type_input: optional(json)\n    # The vectors and texts are read from the paths Embeddings Field and Texts\n    # Field name; embeddings and texts are their defaults.\n    request_data:\n      embeddings: array (optional) - One vector, or a list of vectors. Required by INSERT and SEARCH at the default Embeddings Field.\n      texts: array (optional) - One text per vector, stored alongside it by INSERT, at the default Texts Field.\n      metadata: array (optional) - One object per vector, stored alongside it by INSERT.\n      ids: array (optional) - The ids of the vectors to delete, for DELETE.\n      filter: string (optional) - A Milvus filter expression selecting the vectors to delete, for DELETE. Wins over Filter Expression.\n    artifact_type_output: json\n    # response_data is the incoming request_data, less the raw vectors, with\n    # the operation's result on top.\n    response_data_passthrough: request_data\n    response_data_passthrough_except: [embeddings, vectors, query_vectors]\n    response_data:\n      operation: string - The operation that ran.\n      collection_name: string - The collection acted on; empty for LIST_COLLECTIONS.\n      insert_count: integer (optional) - INSERT only - number of vectors stored.\n      inserted_ids: array (optional) - INSERT only - the ids Milvus gave the stored vectors, in order.\n      sources: array (optional) - SEARCH only - matches with id, distance, text and metadata; for a list of query vectors, one list of matches per vector.\n      collection_missing: boolean (optional) - SEARCH only - true when the collection does not exist, so no matches.\n      deleted: integer (optional) - DELETE only - number of vectors removed.\n      collections: array (optional) - LIST_COLLECTIONS only - collection names, sorted.\n\ninput_parameters:\n  - name: operation\n    type: select\n    label: Operation\n    options: [CREATE_COLLECTION, INSERT, SEARCH, DELETE, LIST_COLLECTIONS, DROP_COLLECTION]\n    default: SEARCH\n    required: true\n    description: The Milvus operation this node runs.\n  - name: collection_name\n    type: text\n    label: Collection Name\n    default: \"\"\n    description: The collection to act on. Accepts ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [CREATE_COLLECTION, INSERT, SEARCH, DELETE, DROP_COLLECTION]\n  - name: embeddings_field\n    type: text\n    label: Embeddings Field\n    default: \"${embeddings}\"\n    description: A ${path} reference to the vector, or list of vectors, in the incoming data.\n    depends_on:\n      parameter: operation\n      visible_when: [INSERT, SEARCH]\n  - name: texts_field\n    type: text\n    label: Texts Field\n    default: \"${texts}\"\n    description: A ${path} reference to the texts stored with the vectors, one per vector. Optional in the data.\n    depends_on:\n      parameter: operation\n      visible_when: [INSERT]\n  - name: dimension\n    type: integer\n    label: Vector Dimension\n    default: 1536\n    constraints:\n      min: 1\n      max: 32768\n    description: The length of every vector the collection will hold; it must match your embedding model.\n    depends_on:\n      parameter: operation\n      visible_when: [CREATE_COLLECTION]\n  - name: metric_type\n    type: select\n    label: Distance Metric\n    options: [COSINE, L2, IP]\n    default: COSINE\n    description: How similarity is measured. Set once when the collection is created; searches use it.\n    depends_on:\n      parameter: operation\n      visible_when: [CREATE_COLLECTION]\n  - name: top_k\n    type: integer\n    label: Top K Results\n    default: 10\n    constraints:\n      min: 1\n      max: 1000\n    description: The most matches SEARCH returns per query vector.\n    depends_on:\n      parameter: operation\n      visible_when: [SEARCH]\n  - name: filter_expr\n    type: text\n    label: Filter Expression\n    default: \"\"\n    description: A Milvus filter expression that narrows SEARCH, or selects what DELETE removes. Accepts ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [SEARCH, DELETE]\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "embeddings": {
+            "type": "array",
+            "required": false,
+            "description": "One vector, or a list of vectors. Required by INSERT and SEARCH at the default Embeddings Field."
+          },
+          "texts": {
+            "type": "array",
+            "required": false,
+            "description": "One text per vector, stored alongside it by INSERT, at the default Texts Field."
+          },
+          "metadata": {
+            "type": "array",
+            "required": false,
+            "description": "One object per vector, stored alongside it by INSERT."
+          },
+          "ids": {
+            "type": "array",
+            "required": false,
+            "description": "The ids of the vectors to delete, for DELETE."
+          },
+          "filter": {
+            "type": "string",
+            "required": false,
+            "description": "A Milvus filter expression selecting the vectors to delete, for DELETE. Wins over Filter Expression."
+          }
+        },
+        "response_data_schema": {
+          "operation": {
+            "type": "string",
+            "required": true,
+            "description": "The operation that ran."
+          },
+          "collection_name": {
+            "type": "string",
+            "required": true,
+            "description": "The collection acted on; empty for LIST_COLLECTIONS."
+          },
+          "insert_count": {
+            "type": "integer",
+            "required": false,
+            "description": "INSERT only - number of vectors stored."
+          },
+          "inserted_ids": {
+            "type": "array",
+            "required": false,
+            "description": "INSERT only - the ids Milvus gave the stored vectors, in order."
+          },
+          "sources": {
+            "type": "array",
+            "required": false,
+            "description": "SEARCH only - matches with id, distance, text and metadata; for a list of query vectors, one list of matches per vector."
+          },
+          "collection_missing": {
+            "type": "boolean",
+            "required": false,
+            "description": "SEARCH only - true when the collection does not exist, so no matches."
+          },
+          "deleted": {
+            "type": "integer",
+            "required": false,
+            "description": "DELETE only - number of vectors removed."
+          },
+          "collections": {
+            "type": "array",
+            "required": false,
+            "description": "LIST_COLLECTIONS only - collection names, sorted."
+          }
+        },
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "json",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ],
+        "response_data_passthrough_except": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

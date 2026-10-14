@@ -1,0 +1,66 @@
+extension_type: AGENT
+name: Storyteller
+description: Reads the story artifact, writes an ending with Claude, and returns the finished story.
+tags:
+  - beginner
+  - agent
+  - anthropic
+input_ports:
+  - port_name: input
+    port_type: in
+    # The story arrives as the artifact, and the finished story leaves as one.
+    artifact_type_input: text
+    artifact_type_output: text
+    request_data:
+      words_in_opening:
+        type: integer
+        description: How many words the opening has.
+    response_data:
+      words_in_opening:
+        type: integer
+        description: How many words the opening had.
+      words_added:
+        type: integer
+        description: How many words the ending added.
+      model:
+        type: string
+        description: The model that wrote the ending.
+      provider:
+        type: string
+        description: The model provider (anthropic).
+      tokens_in:
+        type: integer
+        description: Prompt tokens the call used.
+      tokens_out:
+        type: integer
+        description: Completion tokens the call used.
+output_ports:
+- port_name: output
+  port_type: out
+  artifact_type_input: text
+  artifact_type_output: text
+  response_data:
+    words_in_opening:
+      type: integer
+      description: How many words the opening had.
+    words_added:
+      type: integer
+      description: How many words the ending added.
+    model:
+      type: string
+      description: The model that wrote the ending.
+    provider:
+      type: string
+      description: The model provider (anthropic).
+    tokens_in:
+      type: integer
+      description: Prompt tokens the call used.
+    tokens_out:
+      type: integer
+      description: Completion tokens the call used.
+input_parameters: []
+required_secrets:
+  - name: ANTHROPIC_API_KEY
+    label: Anthropic API key
+    description: Your Anthropic API key. The agent reads it at run time; it is never stored in the component.
+    required: true

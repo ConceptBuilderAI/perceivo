@@ -1,0 +1,977 @@
+{
+  "export_version": "1.0",
+  "export_type": "orchestration",
+  "exported_at": "2026-10-11T22:56:05.123156Z",
+  "orchestration": {
+    "name": "Production Line",
+    "description": "A line supervisor agent starts four tool stages - Cut, Weld, Paint, Inspection - each of which calls the next.",
+    "tags": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "runtime_config": null,
+    "disable_intermediate_snapshots": false
+  },
+  "components": {
+    "comp_0": {
+      "asset_id": null,
+      "name": "Work Order",
+      "category": "START",
+      "description": "Takes the product to build and how long each stage should take.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "start"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import perceivo\nfrom perceivo.primitives import StartInput, StartOutput\n\n\n@perceivo.start\nasync def work_order(input: StartInput) -> StartOutput:\n    \"\"\"Check the work order and send it to the line supervisor.\"\"\"\n    product = input.request_data.get(\"product\", \"\").strip()\n    seconds = int(input.request_data.get(\"seconds_per_stage\", 5))\n\n    if not product:\n        raise ValueError(\"'product' is required.\")\n    if not 1 <= seconds <= 30:\n        raise ValueError(\"'seconds_per_stage' must be between 1 and 30.\")\n\n    return StartOutput(response_data={\"product\": product, \"seconds_per_stage\": seconds})\n",
+      "manifest_yaml": "extension_type: START\nname: Work Order\ndescription: Takes the product to build and how long each stage should take.\ntags:\n  - beginner\n  - start\nexternal_in_port:\n  port_name: external_in\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: none\n  request_data:\n    product:\n      type: string\n      description: What the line should make, for example \"bicycle frame\".\n    seconds_per_stage:\n      type: integer\n      description: How long each of the four stages works, 1 to 30 seconds.\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_input: json\n    artifact_type_output: none\n    response_data:\n      product:\n        type: string\n        description: What the line should make.\n      seconds_per_stage:\n        type: integer\n        description: How long each stage works.\ninput_parameters: []\ninput_prompt: Name a product and how many seconds each stage should take.\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "external_in",
+          "label": null,
+          "port_type": "external_in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line should make, for example \"bicycle frame\"."
+            },
+            "seconds_per_stage": {
+              "type": "integer",
+              "description": "How long each of the four stages works, 1 to 30 seconds."
+            }
+          },
+          "response_data_schema": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "OUT",
+          "key": "output",
+          "label": null,
+          "port_type": "out",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line should make."
+            },
+            "seconds_per_stage": {
+              "type": "integer",
+              "description": "How long each stage works."
+            }
+          },
+          "artifact_type_input": "json",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_1": {
+      "asset_id": null,
+      "name": "Line Supervisor",
+      "category": "AGENT",
+      "description": "Starts the production line by calling the first stage, Cut, and reports the result.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "agent"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import perceivo\nfrom perceivo.primitives import AgentInput, AgentOutput, Artifact, ArtifactType\n\n\n@perceivo.agent\nasync def line_supervisor(input: AgentInput) -> AgentOutput:\n    \"\"\"Call the first stage and wait while the whole line runs.\"\"\"\n    product = input.request_data[\"product\"]\n    seconds = input.request_data[\"seconds_per_stage\"]\n\n    perceivo.log.info(\"Line Supervisor: starting the line\", product=product)\n\n    # Cut calls Weld, Weld calls Paint, Paint calls Inspection. This one call\n    # returns when Inspection has finished and every stage has handed back.\n    result = await perceivo.flow.invoke(\n        \"first_stage\",\n        request_data={\"product\": product, \"seconds\": seconds, \"traveler\": \"\"},\n    )\n    traveler = result[\"response_data\"][\"traveler\"]\n    passed = result[\"response_data\"][\"passed\"]\n    stages_completed = len(traveler.strip().splitlines())\n\n    perceivo.log.info(\"Line Supervisor: line finished\", stages_completed=stages_completed, passed=passed)\n\n    return AgentOutput(\n        artifact=Artifact(type=ArtifactType.TEXT, data=f\"{product}\\n{traveler}\"),\n        response_data={\"product\": product, \"stages_completed\": stages_completed, \"passed\": passed},\n    )\n",
+      "manifest_yaml": "extension_type: AGENT\nname: Line Supervisor\ndescription: Starts the production line by calling the first stage, Cut, and reports the result.\ntags:\n  - beginner\n  - agent\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: text\n    request_data:\n      product:\n        type: string\n        description: What the line should make.\n      seconds_per_stage:\n        type: integer\n        description: How long each stage works.\n    response_data:\n      product:\n        type: string\n        description: What the line made.\n      stages_completed:\n        type: integer\n        description: How many stages finished.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\ntool_ports:\n  - port_name: first_stage\n    port_type: tool\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      product:\n        type: string\n        description: What the line is making.\n      seconds:\n        type: integer\n        description: How long each stage works.\n      traveler:\n        type: string\n        description: The record of stages finished so far (empty to begin).\n    response_data:\n      traveler:\n        type: string\n        description: The record of every stage, ending with Inspection.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: text\n  artifact_type_output: text\n  response_data:\n    product:\n      type: string\n      description: What the line made.\n    stages_completed:\n      type: integer\n      description: How many stages finished.\n    passed:\n      type: boolean\n      description: Whether the product passed inspection.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "OUT",
+          "key": "first_stage",
+          "label": null,
+          "port_type": "tool",
+          "contract": null,
+          "tool_call": true,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far (empty to begin)."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line should make."
+            },
+            "seconds_per_stage": {
+              "type": "integer",
+              "description": "How long each stage works."
+            }
+          },
+          "response_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line made."
+            },
+            "stages_completed": {
+              "type": "integer",
+              "description": "How many stages finished."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "text",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_2": {
+      "asset_id": null,
+      "name": "Cut",
+      "category": "TOOL",
+      "description": "Stage 1 of the production line. Cuts the parts, then calls Weld.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "tool"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import asyncio\n\nimport perceivo\nfrom perceivo.primitives import ToolInput, ToolOutput\n\n\n@perceivo.tool\nasync def cut(input: ToolInput) -> ToolOutput:\n    \"\"\"Stage 1: cutting the parts, then hand the work order to Weld.\"\"\"\n    product = input.request_data[\"product\"]\n    seconds = input.request_data[\"seconds\"]\n    traveler = input.request_data[\"traveler\"]\n\n    perceivo.log.info(\"Cut: cutting the parts\", product=product, seconds=seconds)\n    await asyncio.sleep(seconds)\n    traveler = traveler + \"Cut: done\\n\"\n\n    # Call the next stage through this tool's own tool port, and wait for it.\n    result = await perceivo.flow.invoke(\n        \"next_stage\",\n        request_data={\"product\": product, \"seconds\": seconds, \"traveler\": traveler},\n    )\n    # Pass the next stage's answer back up the line, field by field.\n    answer = result[\"response_data\"]\n    return ToolOutput(response_data={\"traveler\": answer[\"traveler\"], \"passed\": answer[\"passed\"]})\n",
+      "manifest_yaml": "extension_type: TOOL\nname: Cut\ndescription: Stage 1 of the production line. Cuts the parts, then calls Weld.\ntags:\n  - beginner\n  - tool\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      product:\n        type: string\n        description: What the line is making.\n      seconds:\n        type: integer\n        description: How long each stage works.\n      traveler:\n        type: string\n        description: The record of stages finished so far.\n    response_data:\n      traveler:\n        type: string\n        description: The record of every stage, ending with Inspection.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\ntool_ports:\n  - port_name: next_stage\n    port_type: tool\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n        product:\n          type: string\n          description: What the line is making.\n        seconds:\n          type: integer\n          description: How long each stage works.\n        traveler:\n          type: string\n          description: The record of stages finished so far.\n    response_data:\n        traveler:\n          type: string\n          description: The record of every stage, ending with Inspection.\n        passed:\n          type: boolean\n          description: Whether the product passed inspection.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "OUT",
+          "key": "next_stage",
+          "label": null,
+          "port_type": "tool",
+          "contract": null,
+          "tool_call": true,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_3": {
+      "asset_id": null,
+      "name": "Weld",
+      "category": "TOOL",
+      "description": "Stage 2 of the production line. Welds the frame, then calls Paint.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "tool"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import asyncio\n\nimport perceivo\nfrom perceivo.primitives import ToolInput, ToolOutput\n\n\n@perceivo.tool\nasync def weld(input: ToolInput) -> ToolOutput:\n    \"\"\"Stage 2: welding the frame, then hand the work order to Paint.\"\"\"\n    product = input.request_data[\"product\"]\n    seconds = input.request_data[\"seconds\"]\n    traveler = input.request_data[\"traveler\"]\n\n    perceivo.log.info(\"Weld: welding the frame\", product=product, seconds=seconds)\n    await asyncio.sleep(seconds)\n    traveler = traveler + \"Weld: done\\n\"\n\n    # Call the next stage through this tool's own tool port, and wait for it.\n    result = await perceivo.flow.invoke(\n        \"next_stage\",\n        request_data={\"product\": product, \"seconds\": seconds, \"traveler\": traveler},\n    )\n    # Pass the next stage's answer back up the line, field by field.\n    answer = result[\"response_data\"]\n    return ToolOutput(response_data={\"traveler\": answer[\"traveler\"], \"passed\": answer[\"passed\"]})\n",
+      "manifest_yaml": "extension_type: TOOL\nname: Weld\ndescription: Stage 2 of the production line. Welds the frame, then calls Paint.\ntags:\n  - beginner\n  - tool\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      product:\n        type: string\n        description: What the line is making.\n      seconds:\n        type: integer\n        description: How long each stage works.\n      traveler:\n        type: string\n        description: The record of stages finished so far.\n    response_data:\n      traveler:\n        type: string\n        description: The record of every stage, ending with Inspection.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\ntool_ports:\n  - port_name: next_stage\n    port_type: tool\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n        product:\n          type: string\n          description: What the line is making.\n        seconds:\n          type: integer\n          description: How long each stage works.\n        traveler:\n          type: string\n          description: The record of stages finished so far.\n    response_data:\n        traveler:\n          type: string\n          description: The record of every stage, ending with Inspection.\n        passed:\n          type: boolean\n          description: Whether the product passed inspection.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "OUT",
+          "key": "next_stage",
+          "label": null,
+          "port_type": "tool",
+          "contract": null,
+          "tool_call": true,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_4": {
+      "asset_id": null,
+      "name": "Paint",
+      "category": "TOOL",
+      "description": "Stage 3 of the production line. Paints the frame, then calls Inspection.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "tool"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import asyncio\n\nimport perceivo\nfrom perceivo.primitives import ToolInput, ToolOutput\n\n\n@perceivo.tool\nasync def paint(input: ToolInput) -> ToolOutput:\n    \"\"\"Stage 3: painting the frame, then hand the work order to Inspection.\"\"\"\n    product = input.request_data[\"product\"]\n    seconds = input.request_data[\"seconds\"]\n    traveler = input.request_data[\"traveler\"]\n\n    perceivo.log.info(\"Paint: painting the frame\", product=product, seconds=seconds)\n    await asyncio.sleep(seconds)\n    traveler = traveler + \"Paint: done\\n\"\n\n    # Call the next stage through this tool's own tool port, and wait for it.\n    result = await perceivo.flow.invoke(\n        \"next_stage\",\n        request_data={\"product\": product, \"seconds\": seconds, \"traveler\": traveler},\n    )\n    # Pass the next stage's answer back up the line, field by field.\n    answer = result[\"response_data\"]\n    return ToolOutput(response_data={\"traveler\": answer[\"traveler\"], \"passed\": answer[\"passed\"]})\n",
+      "manifest_yaml": "extension_type: TOOL\nname: Paint\ndescription: Stage 3 of the production line. Paints the frame, then calls Inspection.\ntags:\n  - beginner\n  - tool\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      product:\n        type: string\n        description: What the line is making.\n      seconds:\n        type: integer\n        description: How long each stage works.\n      traveler:\n        type: string\n        description: The record of stages finished so far.\n    response_data:\n      traveler:\n        type: string\n        description: The record of every stage, ending with Inspection.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\ntool_ports:\n  - port_name: next_stage\n    port_type: tool\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n        product:\n          type: string\n          description: What the line is making.\n        seconds:\n          type: integer\n          description: How long each stage works.\n        traveler:\n          type: string\n          description: The record of stages finished so far.\n    response_data:\n        traveler:\n          type: string\n          description: The record of every stage, ending with Inspection.\n        passed:\n          type: boolean\n          description: Whether the product passed inspection.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "OUT",
+          "key": "next_stage",
+          "label": null,
+          "port_type": "tool",
+          "contract": null,
+          "tool_call": true,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_5": {
+      "asset_id": null,
+      "name": "Inspection",
+      "category": "TOOL",
+      "description": "Stage 4 of the production line. Inspects the finished product, then returns the result.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "tool"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import asyncio\n\nimport perceivo\nfrom perceivo.primitives import ToolInput, ToolOutput\n\n\n@perceivo.tool\nasync def inspection(input: ToolInput) -> ToolOutput:\n    \"\"\"Stage 4: inspecting the finished product. This is the last stage, so it returns the result.\"\"\"\n    product = input.request_data[\"product\"]\n    seconds = input.request_data[\"seconds\"]\n    traveler = input.request_data[\"traveler\"]\n\n    perceivo.log.info(\"Inspection: inspecting the finished product\", product=product, seconds=seconds)\n    await asyncio.sleep(seconds)\n    traveler = traveler + \"Inspection: passed\\n\"\n\n    return ToolOutput(response_data={\"traveler\": traveler, \"passed\": True})\n",
+      "manifest_yaml": "extension_type: TOOL\nname: Inspection\ndescription: Stage 4 of the production line. Inspects the finished product, then returns the result.\ntags:\n  - beginner\n  - tool\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      product:\n        type: string\n        description: What the line is making.\n      seconds:\n        type: integer\n        description: How long each stage works.\n      traveler:\n        type: string\n        description: The record of stages finished so far.\n    response_data:\n      traveler:\n        type: string\n        description: The record of every stage, ending with Inspection.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line is making."
+            },
+            "seconds": {
+              "type": "integer",
+              "description": "How long each stage works."
+            },
+            "traveler": {
+              "type": "string",
+              "description": "The record of stages finished so far."
+            }
+          },
+          "response_data_schema": {
+            "traveler": {
+              "type": "string",
+              "description": "The record of every stage, ending with Inspection."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    },
+    "comp_6": {
+      "asset_id": null,
+      "name": "Shipping",
+      "category": "END",
+      "description": "Ships the product if it passed inspection, and returns the traveler.",
+      "short_description": null,
+      "tags": [
+        "beginner",
+        "end"
+      ],
+      "config": null,
+      "additional_packages": null,
+      "requires_gpu": false,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "script": "import perceivo\nfrom perceivo.primitives import EndInput, EndOutput\n\n\n@perceivo.end\nasync def shipping(input: EndInput) -> EndOutput:\n    \"\"\"Ship the product, or hold it if it failed inspection.\"\"\"\n    passed = input.response_data.get(\"passed\", False)\n\n    return EndOutput(\n        artifact=input.artifact,\n        response_data={\n            \"product\": input.response_data.get(\"product\", \"\"),\n            \"stages_completed\": input.response_data.get(\"stages_completed\", 0),\n            \"status\": \"shipped\" if passed else \"held for rework\",\n        },\n    )\n",
+      "manifest_yaml": "extension_type: END\nname: Shipping\ndescription: Ships the product if it passed inspection, and returns the traveler.\ntags:\n  - beginner\n  - end\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: text\n    request_data:\n      product:\n        type: string\n        description: What the line made.\n      stages_completed:\n        type: integer\n        description: How many stages finished.\n      passed:\n        type: boolean\n        description: Whether the product passed inspection.\nexternal_out_port:\n  port_name: external_out\n  port_type: external_out\n  artifact_type_input: text\n  response_data:\n    product:\n      type: string\n      description: What the line made.\n    stages_completed:\n      type: integer\n      description: How many stages finished.\n    status:\n      type: string\n      description: shipped, or held for rework.\ninput_parameters: []\nrequired_secrets: []\n",
+      "ports": [
+        {
+          "direction": "OUT",
+          "key": "external_out",
+          "label": null,
+          "port_type": "external_out",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line made."
+            },
+            "stages_completed": {
+              "type": "integer",
+              "description": "How many stages finished."
+            },
+            "status": {
+              "type": "string",
+              "description": "shipped, or held for rework."
+            }
+          },
+          "artifact_type_input": "text",
+          "artifact_type_output": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        },
+        {
+          "direction": "IN",
+          "key": "input",
+          "label": null,
+          "port_type": "in",
+          "contract": null,
+          "tool_call": false,
+          "post_tool_contract": null,
+          "base_schema": null,
+          "artifact_type_constraint": null,
+          "allowed_states": null,
+          "request_data_schema": {
+            "product": {
+              "type": "string",
+              "description": "What the line made."
+            },
+            "stages_completed": {
+              "type": "integer",
+              "description": "How many stages finished."
+            },
+            "passed": {
+              "type": "boolean",
+              "description": "Whether the product passed inspection."
+            }
+          },
+          "response_data_schema": null,
+          "artifact_type_input": "text",
+          "artifact_type_output": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "multi_artifact": null,
+          "artifact_types": null,
+          "response_data_passthrough": null,
+          "response_data_passthrough_except": null,
+          "response_data_contract": null
+        }
+      ],
+      "fsm_states": [],
+      "is_template_clone": false,
+      "template_source_id": null,
+      "is_prebuilt_reference": false,
+      "prebuilt_asset_id": null
+    }
+  },
+  "nodes": [
+    {
+      "local_id": "node_work_order",
+      "component_ref": "comp_0",
+      "component_asset_id": null,
+      "name": "Work Order",
+      "position": {
+        "x": 50,
+        "y": 236
+      },
+      "config": null
+    },
+    {
+      "local_id": "node_line_supervisor",
+      "component_ref": "comp_1",
+      "component_asset_id": null,
+      "name": "Line Supervisor",
+      "position": {
+        "x": 326,
+        "y": 220
+      },
+      "config": {
+        "port_sides": {
+          "first_stage": "bottom"
+        },
+        "mainflow_target_node_ref": "node_shipping"
+      }
+    },
+    {
+      "local_id": "node_cut",
+      "component_ref": "comp_2",
+      "component_asset_id": null,
+      "name": "Cut",
+      "position": {
+        "x": 335,
+        "y": 430
+      },
+      "config": {
+        "port_sides": {
+          "input": "top"
+        },
+        "appearance": {
+          "icon": "zap",
+          "shape": "diamond",
+          "size": "sm",
+          "color": "red"
+        }
+      }
+    },
+    {
+      "local_id": "node_weld",
+      "component_ref": "comp_3",
+      "component_asset_id": null,
+      "name": "Weld",
+      "position": {
+        "x": 545,
+        "y": 600
+      },
+      "config": {
+        "port_sides": {
+          "input": "left"
+        },
+        "appearance": {
+          "icon": "settings",
+          "shape": "hexagon",
+          "size": "md",
+          "color": "orange"
+        }
+      }
+    },
+    {
+      "local_id": "node_paint",
+      "component_ref": "comp_4",
+      "component_asset_id": null,
+      "name": "Paint",
+      "position": {
+        "x": 755,
+        "y": 770
+      },
+      "config": {
+        "port_sides": {
+          "input": "left"
+        },
+        "appearance": {
+          "icon": "layers",
+          "shape": "circle",
+          "size": "md",
+          "color": "violet"
+        }
+      }
+    },
+    {
+      "local_id": "node_inspection",
+      "component_ref": "comp_5",
+      "component_asset_id": null,
+      "name": "Inspection",
+      "position": {
+        "x": 965,
+        "y": 940
+      },
+      "config": {
+        "port_sides": {
+          "input": "left"
+        },
+        "appearance": {
+          "icon": "search",
+          "shape": "document",
+          "size": "lg",
+          "color": "green"
+        }
+      }
+    },
+    {
+      "local_id": "node_shipping",
+      "component_ref": "comp_6",
+      "component_asset_id": null,
+      "name": "Shipping",
+      "position": {
+        "x": 570,
+        "y": 236
+      },
+      "config": null
+    }
+  ],
+  "ports": [
+    {
+      "node_ref": "node_work_order",
+      "component_port_key": "external_in",
+      "component_port_direction": "IN",
+      "alias": "external_in",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_work_order",
+      "component_port_key": "output",
+      "component_port_direction": "OUT",
+      "alias": "output",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_line_supervisor",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_line_supervisor",
+      "component_port_key": "first_stage",
+      "component_port_direction": "OUT",
+      "alias": "first_stage",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_cut",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_cut",
+      "component_port_key": "next_stage",
+      "component_port_direction": "OUT",
+      "alias": "next_stage",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_weld",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_weld",
+      "component_port_key": "next_stage",
+      "component_port_direction": "OUT",
+      "alias": "next_stage",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_paint",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_paint",
+      "component_port_key": "next_stage",
+      "component_port_direction": "OUT",
+      "alias": "next_stage",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_inspection",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_shipping",
+      "component_port_key": "input",
+      "component_port_direction": "IN",
+      "alias": "input",
+      "effective_contract": null
+    },
+    {
+      "node_ref": "node_shipping",
+      "component_port_key": "external_out",
+      "component_port_direction": "OUT",
+      "alias": "external_out",
+      "effective_contract": null
+    }
+  ],
+  "edges": [
+    {
+      "source_port_index": 1,
+      "target_port_index": 2,
+      "edge_kind": "MAINFLOW"
+    },
+    {
+      "source_port_index": 3,
+      "target_port_index": 4,
+      "edge_kind": "INVOKE"
+    },
+    {
+      "source_port_index": 5,
+      "target_port_index": 6,
+      "edge_kind": "INVOKE"
+    },
+    {
+      "source_port_index": 7,
+      "target_port_index": 8,
+      "edge_kind": "INVOKE"
+    },
+    {
+      "source_port_index": 9,
+      "target_port_index": 10,
+      "edge_kind": "INVOKE"
+    }
+  ],
+  "secrets_required": []
+}

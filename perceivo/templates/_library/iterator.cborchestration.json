@@ -1,0 +1,641 @@
+{
+  "components": {
+    "comp_0": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "54008d80-ebb7-4fe6-9e87-2ac6ff1d3585",
+      "category": "POLICY",
+      "config": {
+        "detected_endpoints": [],
+        "is_agent_tool_internal": true
+      },
+      "description": "What it does The control policy of the Iterator template. It decides whether a failed item ends the loop.\n\nHow it works The Iterator consults it after every failed item, passing the counts so far and its own settings. It answers exit when Continue On Error is off or the failures have reached Max Failures, and continue otherwise; on exit the Iterator fails the run. If it cannot be reached, the Iterator fails the run rather than carrying on unchecked.\n\nConfigure\n- Nothing here; set Continue On Error and Max Failures on the Iterator FSM.\n\nIn and out In: completed, failed, total, last_error, continue_on_error and max_failures. Out: should_exit and exit_reason.\n\nUse it when\n- You need different stopping rules for a loop: change this policy, and the Iterator follows it.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: policy\nname: Iterator Policy\ndescription: >\n  Internal control policy for the Iterator. Consulted after each failed item,\n  it ends the loop, failing the run, when Continue On Error is off or Max\n  Failures is reached.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      completed: integer (optional) - Items finished so far.\n      failed: integer (optional) - Items failed so far.\n      total: integer (optional) - Items in the array.\n      last_error: string (optional) - The error of the item that just failed.\n      continue_on_error: boolean (optional) - The Iterator's Continue On Error setting.\n      max_failures: integer (optional) - The Iterator's Max Failures setting; 0 means no limit.\n    response_data:\n      should_exit: boolean - True when the loop must stop.\n      exit_reason: string - Why the loop stops; empty when it continues.\n\npolicy_states:\n  - continue\n  - exit\n",
+      "name": "ITERATOR - POLICY (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "completed": {
+              "description": "Items finished so far.",
+              "required": false,
+              "type": "integer"
+            },
+            "continue_on_error": {
+              "description": "The Iterator's Continue On Error setting.",
+              "required": false,
+              "type": "boolean"
+            },
+            "failed": {
+              "description": "Items failed so far.",
+              "required": false,
+              "type": "integer"
+            },
+            "last_error": {
+              "description": "The error of the item that just failed.",
+              "required": false,
+              "type": "string"
+            },
+            "max_failures": {
+              "description": "The Iterator's Max Failures setting; 0 means no limit.",
+              "required": false,
+              "type": "integer"
+            },
+            "total": {
+              "description": "Items in the array.",
+              "required": false,
+              "type": "integer"
+            }
+          },
+          "response_data_schema": {
+            "exit_reason": {
+              "description": "Why the loop stops; empty when it continues.",
+              "required": true,
+              "type": "string"
+            },
+            "should_exit": {
+              "description": "True when the loop must stop.",
+              "required": true,
+              "type": "boolean"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.policy\nasync def iterator_policy_internal(\n    input: perceivo.primitives.PolicyInput,\n) -> perceivo.primitives.PolicyOutput:\n    \"\"\"Decide whether a failed item ends the Iterator's loop.\"\"\"\n    rd = input.request_data or {}\n    failed = int(rd.get(\"failed\", 0) or 0)\n    max_failures = int(rd.get(\"max_failures\", 0) or 0)\n\n    if not rd.get(\"continue_on_error\", False):\n        reason = f\"item failed and Continue On Error is off: {rd.get('last_error', '')}\".rstrip(\n            \": \"\n        )\n    elif max_failures and failed >= max_failures:\n        reason = f\"{failed} items failed, reaching Max Failures ({max_failures})\"\n    else:\n        return perceivo.primitives.PolicyOutput(\n            next_state=\"continue\", response_data={\"should_exit\": False, \"exit_reason\": \"\"}\n        )\n    return perceivo.primitives.PolicyOutput(\n        next_state=\"exit\", response_data={\"should_exit\": True, \"exit_reason\": reason}\n    )\n",
+      "short_description": "The control policy of the Iterator template; decides whether a failed item ends the loop.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_1": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "7756e459-bd76-4a64-a5a0-c639fceb7213",
+      "category": "START",
+      "config": {
+        "detected_endpoints": [],
+        "input_parameters": {
+          "declarations": [
+            {
+              "_schema_type": "string",
+              "label": "prompt",
+              "name": "prompt",
+              "required": true,
+              "type": "text"
+            }
+          ],
+          "values": {}
+        },
+        "is_generic_start": true,
+        "port_order": [
+          "external_input",
+          "output"
+        ]
+      },
+      "description": "What it does The entry point of the Iterator template. It accepts the data holding the list to iterate.\n\nHow it works Passes the incoming data and any accompanying file straight through to the executor, which hands the same input to each slot.\n\nConfigure Nothing.\n\nIn and out In: the caller's request. Out: the same, unchanged, into the executor.\n\nUse it when It comes with the Iterator template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+      "name": "ITERATOR - START (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "external_input",
+          "label": "External Input",
+          "multi_artifact": false,
+          "port_type": "external_in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "output",
+          "label": "Output",
+          "multi_artifact": false,
+          "port_type": "out",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.start\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    return perceivo.primitives.StartOutput(\n        artifact=input.artifact,\n        response_data=input.request_data or {},\n    )\n",
+      "short_description": "The entry point of the Iterator template. It accepts the data holding the list to iterate.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_2": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "c80b7500-afcf-4b46-ac8b-585a1e25288c",
+      "category": "FSM",
+      "config": {
+        "detected_endpoints": [],
+        "fsm": {
+          "max_steps": 1
+        },
+        "icon": {
+          "type": "lucide",
+          "value": "repeat"
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "default": "items",
+              "description": "Where the array is in the incoming data; a dotted path such as state_1.files works.",
+              "label": "Item Key",
+              "name": "item_key",
+              "type": "text"
+            },
+            {
+              "default": 1,
+              "description": "How many items run at once; 1 runs them strictly in order.",
+              "label": "Max Parallel",
+              "name": "max_parallel",
+              "type": "integer"
+            },
+            {
+              "default": false,
+              "description": "Off (default) fails the run at the first failed item. On records failures in errors and carries on.",
+              "label": "Continue On Error",
+              "name": "continue_on_error",
+              "type": "boolean"
+            },
+            {
+              "default": 0,
+              "description": "With Continue On Error on, fail the run once this many items have failed; 0 means no limit.",
+              "label": "Max Failures",
+              "name": "max_failures",
+              "type": "integer"
+            }
+          ],
+          "values": {
+            "continue_on_error": false,
+            "item_key": "items",
+            "max_failures": 0,
+            "max_parallel": 1
+          }
+        },
+        "port_order": [
+          "input",
+          "handler"
+        ],
+        "port_sides": {
+          "handler": "bottom",
+          "input": "left"
+        }
+      },
+      "description": "What it does The engine of the Iterator template. It runs the handler slot once for every item of the incoming list and gathers the results in list order.\n\nHow it works It reads the list at Item Key, then invokes the handler with each item as iterator_item, its position as iterator_index and the list length as iterator_total, alongside the original data. Max Parallel bounds how many run at once. After a failed item it asks the paired policy whether to carry on. When the policy stops the loop, or cannot be reached, items not yet started are skipped, the ones already running are awaited, and the run fails with the failed item's error.\n\nConfigure\n- Item Key - where the list is, as a dotted path.\n- Max Parallel - items run at once, 1 to 50.\n- Continue On Error and Max Failures - whether a failure fails the run (by default it does).\n\nIn and out In: the data holding the list. Out: results, total, completed, failed and errors, as data and as a JSON artifact.\n\nUse it when\n- You are editing how the Iterator template loops; wire work into the handler slot instead of changing this script.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: fsm\nname: Iterator\ndescription: >\n  FSM layer that runs its handler slot once per item of an incoming array,\n  in order or a bounded number at a time, and returns every item's result\n  in input order. After a failed item the paired policy decides whether to\n  carry on; when it stops the loop, the run fails.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: optional(json)\n    artifact_type_output: json\n    request_data:\n      items: array (optional) - The array to iterate; read from Item Key, which may be a dotted path.\n    response_data:\n      results: array - Each item's response_data in input order; null for a failed item.\n      total: integer - How many items there were.\n      completed: integer - How many items the handler finished.\n      failed: integer - How many items failed; above 0 only when Continue On Error is on.\n      errors: array - index and error for each failed item, in input order.\n\nstate_ports:\n  - port_name: handler\n    artifact_type_input: none\n    artifact_type_output: none\n\npolicy_ports:\n  - port_name: policy\n    artifact_type_input: none\n    artifact_type_output: none\n    response_data:\n      should_exit: boolean - True when the loop must stop.\n      exit_reason: string (optional) - Why the loop stops.\n\ninput_parameters:\n  - name: item_key\n    type: text\n    label: Item Key\n    default: items\n    description: Where the array is in the incoming data; a dotted path such as state_1.files works.\n  - name: max_parallel\n    type: integer\n    label: Max Parallel\n    default: 1\n    description: How many items run at once; 1 runs them strictly in order.\n  - name: continue_on_error\n    type: boolean\n    label: Continue On Error\n    default: false\n    description: Off (default) fails the run at the first failed item. On records failures in errors and carries on.\n  - name: max_failures\n    type: integer\n    label: Max Failures\n    default: 0\n    description: With Continue On Error on, fail the run once this many items have failed; 0 means no limit.\n",
+      "name": "ITERATOR - FSM (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "optional(json)",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "items": {
+              "description": "The array to iterate; read from Item Key, which may be a dotted path.",
+              "required": false,
+              "type": "array"
+            }
+          },
+          "response_data_schema": {
+            "completed": {
+              "description": "How many items the handler finished.",
+              "required": true,
+              "type": "integer"
+            },
+            "errors": {
+              "description": "index and error for each failed item, in input order.",
+              "required": true,
+              "type": "array"
+            },
+            "failed": {
+              "description": "How many items failed; above 0 only when Continue On Error is on.",
+              "required": true,
+              "type": "integer"
+            },
+            "results": {
+              "description": "Each item's response_data in input order; null for a failed item.",
+              "required": true,
+              "type": "array"
+            },
+            "total": {
+              "description": "How many items there were.",
+              "required": true,
+              "type": "integer"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "policy",
+          "label": "Policy",
+          "multi_artifact": false,
+          "port_type": "policy",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "exit_reason": {
+              "description": "Why the loop stops.",
+              "required": false,
+              "type": "string"
+            },
+            "should_exit": {
+              "description": "True when the loop must stop.",
+              "required": true,
+              "type": "boolean"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "handler",
+          "label": "Handler",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import asyncio\n\nimport perceivo\n\n_FALSY = (\"false\", \"0\", \"no\", \"off\", \"\")\n\n\ndef _flag(value) -> bool:\n    if isinstance(value, bool):\n        return value\n    if value is None:\n        return False\n    return str(value).strip().lower() not in _FALSY\n\n\ndef _whole(name: str, default: int, low: int, high: int) -> int:\n    raw = perceivo.params.get(name, default)\n    if raw is None or raw == \"\":\n        raw = default\n    try:\n        number = float(raw)\n    except (TypeError, ValueError):\n        raise ValueError(f\"{name} must be a whole number; got {raw!r}.\") from None\n    if number != int(number) or not low <= number <= high:\n        raise ValueError(f\"{name} must be a whole number from {low} to {high}; got {raw!r}.\")\n    return int(number)\n\n\ndef _resolve(data: dict, path: str):\n    value = data\n    for part in path.split(\".\"):\n        if not isinstance(value, dict) or part not in value:\n            return None\n        value = value[part]\n    return value\n\n\nasync def _should_stop(\n    index: int, completed: int, failed: int, total: int, last_error: str, settings: dict\n) -> tuple[bool, str]:\n    \"\"\"Ask the paired policy whether a failure ends the loop. No answer fails the run.\"\"\"\n    try:\n        verdict = await perceivo.flow.invoke(\n            port_name=\"policy\",\n            request_data={\n                \"completed\": completed,\n                \"failed\": failed,\n                \"total\": total,\n                \"last_error\": last_error,\n                **settings,\n            },\n        )\n    except Exception as exc:\n        raise RuntimeError(\n            f\"Iterator stopped at item {index} of {total}: \"\n            f\"the policy could not be reached ({type(exc).__name__})\"\n        ) from exc\n    answer = (verdict or {}).get(\"response_data\") or {}\n    return bool(answer.get(\"should_exit\", True)), str(answer.get(\"exit_reason\") or \"\")\n\n\n@perceivo.fsm\nasync def iterator(input: perceivo.primitives.FsmInput) -> perceivo.primitives.FsmOutput:\n    \"\"\"Run the handler slot once per item of an array, in order or a few at a time.\n\n    The array is read from the incoming data at Item Key. Each run receives the\n    incoming data plus iterator_item, iterator_index and iterator_total.\n    After a failed item the paired policy decides whether to carry on; when it\n    stops the loop, the run fails with that item's error. Failures are tolerated\n    only when Continue On Error is on, and are then listed in errors.\n    \"\"\"\n    item_key = str(perceivo.params.get(\"item_key\", \"items\") or \"items\").strip()\n    max_parallel = _whole(\"max_parallel\", 1, 1, 50)\n    max_failures = _whole(\"max_failures\", 0, 0, 1_000_000)\n    continue_on_error = _flag(perceivo.params.get(\"continue_on_error\", False))\n\n    data = dict(input.request_data or {})\n    if input.artifact is not None and isinstance(input.artifact.data, dict):\n        data = {**input.artifact.data, **data}\n\n    items = _resolve(data, item_key)\n    if items is None:\n        raise ValueError(f\"No '{item_key}' in the incoming data; received {sorted(data)}.\")\n    if not isinstance(items, list):\n        raise ValueError(f\"'{item_key}' must be an array; got {type(items).__name__}.\")\n\n    total = len(items)\n    settings = {\"continue_on_error\": continue_on_error, \"max_failures\": max_failures}\n    results: list = [None] * total\n    errors: list = []\n    state = {\"completed\": 0, \"failed\": 0, \"stopped\": False}\n    perceivo.log.info(\"Iterator starting\", total=total, max_parallel=max_parallel)\n\n    async def run_item(index: int) -> None:\n        if state[\"stopped\"]:\n            return\n        request = {\n            **data,\n            \"iterator_item\": items[index],\n            \"iterator_index\": index,\n            \"iterator_total\": total,\n        }\n        try:\n            outcome = await perceivo.flow.invoke(port_name=\"handler\", request_data=request)\n        except Exception as exc:\n            state[\"failed\"] += 1\n            message = f\"{type(exc).__name__}: {exc}\"\n            errors.append({\"index\": index, \"error\": message})\n            perceivo.log.warning(\"Iterator item failed\", index=index, error_type=type(exc).__name__)\n            if state[\"stopped\"]:\n                return\n            try:\n                stop, reason = await _should_stop(\n                    index, state[\"completed\"], state[\"failed\"], total, message, settings\n                )\n            except RuntimeError:\n                state[\"stopped\"] = True\n                raise\n            if not stop or state[\"stopped\"]:\n                return\n            state[\"stopped\"] = True\n            raise RuntimeError(\n                f\"Iterator stopped at item {index} of {total}: \"\n                f\"{reason or 'the policy ended the loop'}\"\n            ) from exc\n        results[index] = (outcome or {}).get(\"response_data\") or {}\n        state[\"completed\"] += 1\n\n    if max_parallel == 1:\n        for index in range(total):\n            await run_item(index)\n    else:\n        gate = asyncio.Semaphore(max_parallel)\n\n        async def bounded(index: int) -> None:\n            async with gate:\n                await run_item(index)\n\n        # Every started item is awaited before the stop is raised, so none is left\n        # running behind a failed run; items not yet started see the stop and skip.\n        outcomes = await asyncio.gather(*(bounded(i) for i in range(total)), return_exceptions=True)\n        for outcome in outcomes:\n            if isinstance(outcome, BaseException):\n                raise outcome\n\n    errors.sort(key=lambda e: e[\"index\"])\n    summary = {\n        \"results\": results,\n        \"total\": total,\n        \"completed\": state[\"completed\"],\n        \"failed\": state[\"failed\"],\n        \"errors\": errors,\n    }\n    perceivo.log.info(\"Iterator finished\", completed=state[\"completed\"], failed=state[\"failed\"])\n    return perceivo.primitives.FsmOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON, data=summary, mime_type=\"application/json\"\n        ),\n        response_data=summary,\n    )\n",
+      "short_description": "The engine of the Iterator template. It runs the handler slot once per item and gathers the results.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_3": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "c8f25c87-5dd0-482f-b5ed-6155182ba9c5",
+      "category": "END",
+      "config": {
+        "detected_endpoints": [],
+        "is_generic_end": true,
+        "output_parameters": {
+          "declarations": [],
+          "values": {}
+        },
+        "port_order": [
+          "input",
+          "external_output"
+        ]
+      },
+      "description": "What it does The exit of the Iterator template. It returns the collected results of every item.\n\nHow it works Takes the collected results and returns them as the result of the nested run, so the parent flow can carry on. It adds nothing of its own.\n\nConfigure Nothing.\n\nIn and out In: the collected results of every item. Out: the same data, as the template's result.\n\nUse it when It comes with the Iterator template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: json\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: json\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\n",
+      "name": "ITERATOR - END (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "external_output",
+          "label": "External Output",
+          "multi_artifact": false,
+          "port_type": "external_out",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.end\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data=input.response_data or {},\n    )\n",
+      "short_description": "The exit of the Iterator template. It returns the collected results of every item.",
+      "tags": [],
+      "template_source_id": null
+    }
+  },
+  "edges": [
+    {
+      "edge_kind": "MAINFLOW",
+      "source_port_index": 0,
+      "target_port_index": 1
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 2,
+      "target_port_index": 3
+    }
+  ],
+  "export_type": "orchestration",
+  "export_version": "1.0",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "nodes": [
+    {
+      "component_asset_id": "54008d80-ebb7-4fe6-9e87-2ac6ff1d3585",
+      "component_ref": "comp_0",
+      "config": {
+        "port_sides": {
+          "": "top"
+        }
+      },
+      "local_id": "node_0",
+      "name": "Iterator Policy",
+      "position": {
+        "x": 326.0,
+        "y": 430.0
+      }
+    },
+    {
+      "component_asset_id": "7756e459-bd76-4a64-a5a0-c639fceb7213",
+      "component_ref": "comp_1",
+      "config": {},
+      "local_id": "node_1",
+      "name": "Iterator - Start",
+      "position": {
+        "x": 50.0,
+        "y": 236.0
+      }
+    },
+    {
+      "component_asset_id": "c80b7500-afcf-4b46-ac8b-585a1e25288c",
+      "component_ref": "comp_2",
+      "config": {
+        "_mainflow_target_node_ref": "end",
+        "mainflow_target_node_ref": "node_3",
+        "port_sides": {
+          "": "left"
+        }
+      },
+      "local_id": "node_2",
+      "name": "Iterator",
+      "position": {
+        "x": 326.0,
+        "y": 220.0
+      }
+    },
+    {
+      "component_asset_id": "c8f25c87-5dd0-482f-b5ed-6155182ba9c5",
+      "component_ref": "comp_3",
+      "config": {},
+      "local_id": "node_3",
+      "name": "Iterator - End",
+      "position": {
+        "x": 710.0,
+        "y": 36.0
+      }
+    }
+  ],
+  "orchestration": {
+    "additional_packages": [],
+    "description": "What it does Runs one step for every item of a list - each file, each row, each customer - and collects the results, instead of you wiring the same step again and again.\n\nHow it works Wire the component that handles one item into the handler slot. The template reads the list from the incoming data, then runs the handler once per item, passing the item along with its position and the original data. Items run one after another by default, or a few at a time when you raise Max Parallel. Every item's result comes back in the order of the list. By default the first failed item fails the run with that item's error, so a batch never reports success over a broken item. Turn on Continue On Error to carry on past failures instead: each one is listed with its error, and Max Failures still fails the run once too many have failed. The paired policy makes that decision, from your settings.\n\nConfigure (on the FSM component inside)\n- Item Key - where the list is in the incoming data, for example items or state_1.files.\n- Max Parallel - how many items run at once; 1 keeps them strictly in order.\n- Continue On Error - off (default) fails the run at the first failed item; on carries on and lists the failures.\n- Max Failures - with Continue On Error on, fail the run once this many items have failed; 0 means no limit.\n\nIn and out In: data holding the list at Item Key. Out: results (one per item, in order), total, completed, failed and errors.\n\nUse it when\n- The same step must run over every file, record or message in a list.\n- You want a batch to carry on past a bad item and report which ones failed.\n- A list is long enough that running a few items at a time saves real time.",
+    "disable_intermediate_snapshots": false,
+    "name": "ITERATOR (SYSTEM, READ-ONLY)",
+    "requires_gpu": false,
+    "runtime_config": null,
+    "tags": []
+  },
+  "ports": [
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "output",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "policy",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_0"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "external_input",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "external_output",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    }
+  ],
+  "secrets_required": []
+}

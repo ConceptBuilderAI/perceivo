@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a problem with the Perceivo SDK
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please do **not** include secrets, API
+        keys, or other sensitive data in this report.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear and concise description of the bug, including what you expected instead.
+      placeholder: When I run `perceivo validate ...`, I expected X but got Y.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps or a minimal code sample that reproduces the problem.
+      placeholder: |
+        1. ...
+        2. ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output / traceback
+      description: Paste any error output. This will be rendered as code, so no backticks needed.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: perceivo version
+      placeholder: "e.g. 1.0.0 (output of `pip show perceivo`)"
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "e.g. 3.11.9"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. macOS 14, Ubuntu 24.04, Windows 11"
+    validations:
+      required: true

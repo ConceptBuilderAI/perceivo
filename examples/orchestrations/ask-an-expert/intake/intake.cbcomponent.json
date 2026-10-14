@@ -1,0 +1,94 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-11T22:55:18.392150Z",
+  "component": {
+    "asset_id": null,
+    "name": "Intake",
+    "category": "START",
+    "description": "Takes a profession and a question and hands both to the expert.",
+    "short_description": null,
+    "tags": [
+      "beginner",
+      "start"
+    ],
+    "config": null,
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\nfrom perceivo.primitives import Artifact, ArtifactType, StartInput, StartOutput\n\n\n@perceivo.start\nasync def intake(input: StartInput) -> StartOutput:\n    \"\"\"Read the two inputs, check them, and pass them to the expert.\"\"\"\n    profession = input.request_data.get(\"profession\", \"\").strip()\n    question = input.request_data.get(\"question\", \"\").strip()\n\n    if not profession or not question:\n        raise ValueError(\"Both 'profession' and 'question' are required.\")\n\n    perceivo.log.info(\"Intake received a question\", profession=profession)\n\n    return StartOutput(\n        artifact=Artifact(type=ArtifactType.TEXT, data=question),\n        response_data={\"profession\": profession, \"question\": question},\n    )\n",
+    "manifest_yaml": "extension_type: START\nname: Intake\ndescription: Takes a profession and a question and hands both to the expert.\ntags:\n  - beginner\n  - start\nexternal_in_port:\n  port_name: external_in\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: text\n  request_data:\n    profession:\n      type: string\n      description: Who should answer, for example \"structural engineer\".\n    question:\n      type: string\n      description: The question to ask that expert.\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_input: json\n    artifact_type_output: text\n    response_data:\n      profession:\n        type: string\n        description: The profession, forwarded unchanged.\n      question:\n        type: string\n        description: The question, forwarded unchanged.\ninput_parameters: []\ninput_prompt: Name a profession and ask that expert a question.\nrequired_secrets: []\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "external_in",
+        "label": null,
+        "port_type": "external_in",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "profession": {
+            "type": "string",
+            "description": "Who should answer, for example \"structural engineer\"."
+          },
+          "question": {
+            "type": "string",
+            "description": "The question to ask that expert."
+          }
+        },
+        "response_data_schema": null,
+        "artifact_type_input": "json",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      },
+      {
+        "direction": "OUT",
+        "key": "output",
+        "label": null,
+        "port_type": "out",
+        "contract": null,
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "profession": {
+            "type": "string",
+            "description": "The profession, forwarded unchanged."
+          },
+          "question": {
+            "type": "string",
+            "description": "The question, forwarded unchanged."
+          }
+        },
+        "artifact_type_input": "json",
+        "artifact_type_output": "text",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": null,
+        "artifact_types": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_contract": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

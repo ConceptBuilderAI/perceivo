@@ -1,0 +1,591 @@
+{
+  "models": {
+    "ComponentExportData": {
+      "fields": {
+        "additional_packages": {
+          "annotation": "list[str]|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_type_input": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_type_output": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "asset_id": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "category": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "config": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "description": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "fsm_states": {
+          "annotation": "list[FSMStateExportData]",
+          "default": {
+            "factory": "list",
+            "kind": "factory"
+          }
+        },
+        "is_prebuilt_reference": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "is_template_clone": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "manifest_yaml": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "name": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "ports": {
+          "annotation": "list[PortExportData]",
+          "default": {
+            "factory": "list",
+            "kind": "factory"
+          }
+        },
+        "prebuilt_asset_id": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "requires_gpu": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "script": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "short_description": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "tags": {
+          "annotation": "list[str]|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "template_source_id": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        }
+      }
+    },
+    "EdgeExportData": {
+      "fields": {
+        "edge_kind": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "source_port_index": {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "target_port_index": {
+          "annotation": "int",
+          "default": {
+            "kind": "required"
+          }
+        }
+      }
+    },
+    "FSMStateExportData": {
+      "fields": {
+        "in_port_key": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "is_end": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "is_start": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "label": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "out_port_key": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "state_key": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        }
+      }
+    },
+    "NodeExportData": {
+      "fields": {
+        "component_asset_id": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "component_ref": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "config": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "local_id": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "name": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "orchestration_asset_id": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "orchestration_ref": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "position": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        }
+      }
+    },
+    "OrchestrationExport": {
+      "fields": {
+        "components": {
+          "annotation": "dict[str,ComponentExportData]",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "edges": {
+          "annotation": "list[EdgeExportData]",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "export_type": {
+          "annotation": "Literal['orchestration']",
+          "default": {
+            "kind": "value",
+            "value": "orchestration"
+          }
+        },
+        "export_version": {
+          "annotation": "str",
+          "default": {
+            "kind": "value",
+            "value": "1.0"
+          }
+        },
+        "exported_at": {
+          "annotation": "datetime",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "nodes": {
+          "annotation": "list[NodeExportData]",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "orchestration": {
+          "annotation": "OrchestrationExportMetadata",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "orchestrations": {
+          "annotation": "dict[str,OrchestrationExport]|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "ports": {
+          "annotation": "list[PortRefExportData]",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "secrets_required": {
+          "annotation": "list[SecretHintData]",
+          "default": {
+            "factory": "list",
+            "kind": "factory"
+          }
+        }
+      }
+    },
+    "OrchestrationExportMetadata": {
+      "fields": {
+        "additional_packages": {
+          "annotation": "list[str]|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "description": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "disable_intermediate_snapshots": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "name": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "requires_gpu": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        },
+        "runtime_config": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "tags": {
+          "annotation": "list|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        }
+      }
+    },
+    "PortExportData": {
+      "fields": {
+        "allowed_states": {
+          "annotation": "list|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_input_schema": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_output_schema": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_type_constraint": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_type_input": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_type_output": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "artifact_types": {
+          "annotation": "list|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "base_schema": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "contract": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "direction": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "key": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "label": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "multi_artifact": {
+          "annotation": "bool|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "port_type": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "post_tool_contract": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "request_data_schema": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "response_data_contract": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "response_data_passthrough": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "response_data_passthrough_except": {
+          "annotation": "list|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "response_data_schema": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "tool_call": {
+          "annotation": "bool",
+          "default": {
+            "kind": "value",
+            "value": false
+          }
+        }
+      }
+    },
+    "PortRefExportData": {
+      "fields": {
+        "alias": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "component_port_direction": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "component_port_key": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "effective_contract": {
+          "annotation": "dict|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "node_ref": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        }
+      }
+    },
+    "SecretHintData": {
+      "fields": {
+        "alias": {
+          "annotation": "str",
+          "default": {
+            "kind": "required"
+          }
+        },
+        "hint": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        },
+        "node_ref": {
+          "annotation": "str|None",
+          "default": {
+            "kind": "value",
+            "value": null
+          }
+        }
+      }
+    }
+  },
+  "repository": "platform data service",
+  "root_model": "OrchestrationExport"
+}

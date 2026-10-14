@@ -1,0 +1,1518 @@
+{
+ "router": {
+  "export_version": "1.0",
+  "export_type": "orchestration",
+  "exported_at": "2026-09-27T18:02:00.772025Z",
+  "orchestration": {
+   "name": "Execution Graph Classifier Router - Conditional Router (Prebuilt)",
+   "description": "Nested orchestration replacing the 'Conditional Router (Prebuilt)' composite of 'Execution Graph Classifier Router' (START -> FSM + POLICY + invoked components -> END).",
+   "tags": [],
+   "additional_packages": [],
+   "requires_gpu": false,
+   "runtime_config": {
+    "autoscale_enabled": false,
+    "cpu_limit": "1000m",
+    "cpu_request": "500m",
+    "gpu_limit": "0",
+    "gpu_request": "0",
+    "max_replicas": 3,
+    "memory_limit": "2Gi",
+    "memory_request": "512Mi",
+    "min_replicas": 1
+   },
+   "disable_intermediate_snapshots": false
+  },
+  "components": {
+   "comp_0": {
+    "asset_id": "9ea566bf-677d-4a8a-8d0f-308280a2a5dc",
+    "name": "CONDITIONAL ROUTER - START (SYSTEM, READ-ONLY)",
+    "category": "START",
+    "description": "What it does The entry point of the Conditional Router template. It accepts the data the routing decision will be made on.\n\nHow it works Passes the incoming data and any accompanying file straight through to the router, adding nothing.\n\nConfigure Nothing.\n\nIn and out In: the caller's request. Out: the same, unchanged, into the router.\n\nUse it when It comes with the Conditional Router template. You do not add it separately.",
+    "short_description": "The entry point of the Conditional Router template. It accepts the data the routing decision",
+    "tags": [],
+    "config": {
+     "detected_endpoints": [],
+     "input_parameters": {
+      "declarations": [],
+      "values": {}
+     },
+     "is_generic_start": true,
+     "port_order": [
+      "external_input",
+      "output"
+     ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\r\n\r\n\r\n@perceivo.start\r\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\r\n    return perceivo.primitives.StartOutput(\r\n        artifact=input.artifact,\r\n        response_data=input.request_data or {},\r\n    )\r\n",
+    "manifest_yaml": "extension_type: start\r\nname: Generic Start (Prebuilt)\r\ndescription: Passthrough start component. Define input contract via Inspector.\r\ninput_ports:\r\n- port_name: external_input\r\n  port_type: external_in\r\n  artifact_type_input: json\r\n  artifact_type_output: json\r\noutput_ports:\r\n- port_name: output\r\n  port_type: out\r\n  artifact_type_input: json\r\n  artifact_type_output: optional(json)\r\n  response_data_contract: dynamic\r\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\r\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\r\ninput_parameters: []\r\ninput_prompt: Provide the input data for this orchestration.\r\n",
+    "ports": [
+     {
+      "direction": "IN",
+      "key": "external_input",
+      "label": "External Input",
+      "port_type": "external_in",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "json",
+      "artifact_type_output": "json",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     },
+     {
+      "direction": "OUT",
+      "key": "output",
+      "label": "Output",
+      "port_type": "out",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "json",
+      "artifact_type_output": "optional(json)",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+   },
+   "comp_1": {
+    "asset_id": null,
+    "name": "Conditional Router (Prebuilt)",
+    "category": "FSM",
+    "description": "FSM layer that delegates routing decisions to its connected policy. Configure branch conditions in the Inspector.",
+    "short_description": null,
+    "tags": [],
+    "config": {
+     "detected_endpoints": [],
+     "input_parameters": {
+      "declarations": [
+       {
+        "default": "[]",
+        "description": "JSON array of branch conditions. Managed by the Branch Editor UI.",
+        "label": "Branch Configuration",
+        "name": "branches",
+        "required": false,
+        "type": "text_long"
+       },
+       {
+        "default": "branch_1",
+        "description": "Port name to invoke when no conditions match.",
+        "label": "Default Branch",
+        "name": "default_branch",
+        "type": "text"
+       }
+      ],
+      "values": {
+       "branches": "[{\"port_name\": \"branch_1\", \"field\": \"predicted_orchestration_id\", \"operator\": \"equals\", \"value\": \"@member:Company Policy Chatbot - RAG\"}, {\"port_name\": \"branch_2\", \"field\": \"predicted_orchestration_id\", \"operator\": \"equals\", \"value\": \"@member:Company Policy Chatbot - Plain\"}]",
+       "default_branch": "branch_2"
+      }
+     },
+     "is_conditional_router": true,
+     "mainflow_target_node_id": "6"
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\nimport json as _json\n\n\n@perceivo.fsm\nasync def conditional_router_prebuilt(input: perceivo.primitives.FsmInput) -> perceivo.primitives.FsmOutput:\n    # Read branch configuration from input parameters\n    branches_raw = perceivo.params.get(\"branches\", \"[]\")\n    if isinstance(branches_raw, str):\n        branches = _json.loads(branches_raw)\n    else:\n        branches = branches_raw if isinstance(branches_raw, list) else []\n\n    default_branch = perceivo.params.get(\"default_branch\", \"branch_1\")\n\n    # Get data to evaluate conditions against\n    data = input.request_data or {}\n    if not data and input.artifact and isinstance(input.artifact.data, dict):\n        data = input.artifact.data\n\n    perceivo.log.info(\n        f\"Routing with {len(branches)} branch conditions\",\n        default_branch=default_branch,\n        data_keys=list(data.keys()) if isinstance(data, dict) else [],\n    )\n\n    # Delegate routing decision to policy\n    policy_result = await perceivo.flow.invoke(\n        port_name=\"policy\",\n        request_data={\n            \"data\": data,\n            \"branches\": branches,\n            \"default_branch\": default_branch,\n        }\n    )\n\n    # Extract policy decision\n    policy_response = policy_result.get(\"response_data\", {}) if isinstance(policy_result, dict) else {}\n    next_state = policy_response.get(\"next_state\", default_branch)\n    match_reason = policy_response.get(\"match_reason\", \"policy decision\")\n\n    perceivo.log.info(f\"Policy decided: {next_state} ({match_reason})\")\n\n    # Invoke the selected branch, forwarding the input artifact.\n    # Held in a guarded local so the reads below are visibly tolerant: this\n    # router FORWARDS an inbound artifact, it never requires one. ``X if X is\n    # not None else None`` is ``X`` for every value, so this is a\n    # declaration-truth change, not a behaviour change.\n    inbound_artifact = input.artifact if input.artifact is not None else None\n    result = await perceivo.flow.invoke(\n        port_name=next_state,\n        request_data=data,\n        artifact=inbound_artifact,\n    )\n\n    # Extract artifact from branch result.\n    # WORKAROUND: _format_invoke_result drops perceivo.primitives.Artifact objects because\n    # it isinstance-checks against app.schemas.run_schemas.Artifact (different class).\n    # So result[\"artifact\"] is always None for branch invokes. Instead, reconstruct\n    # the artifact from response_data which IS propagated correctly.\n    result_artifact = inbound_artifact\n    if result and isinstance(result, dict):\n        art = result.get(\"artifact\")\n        if art is not None and hasattr(art, \"data\") and hasattr(art, \"type\"):\n            # Got an actual Artifact object (would work once platform bug is fixed)\n            result_artifact = perceivo.primitives.Artifact(\n                type=art.type if isinstance(art.type, str) else art.type.value,\n                data=art.data,\n                mime_type=getattr(art, \"mime_type\", \"text/plain\"),\n            )\n        elif result.get(\"response_data\"):\n            # Reconstruct artifact from response_data (workaround for platform bug)\n            result_artifact = perceivo.primitives.Artifact(\n                type=perceivo.primitives.ArtifactType.JSON,\n                data=result[\"response_data\"],\n                mime_type=\"application/json\",\n            )\n\n    return perceivo.primitives.FsmOutput(\n        artifact=result_artifact,\n        response_data={\n            \"routed_to\": next_state,\n            \"match_reason\": match_reason,\n            \"branch_response\": result.get(\"response_data\") if isinstance(result, dict) else None,\n        }\n    )\n",
+    "manifest_yaml": "extension_type: fsm\nname: Conditional Router\ndescription: 'Control-flow FSM. Delegates the routing decision to its policy, then\n  invokes exactly one branch slot and republishes that branch''s response_data.\n\n  '\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: json\n  response_data:\n    routed_to: string - The branch port name the policy selected.\n    match_reason: string - Human-readable reason that branch matched.\n    branch_response: object (optional) - response_data returned by the invoked branch.\nstate_ports:\n- port_name: branch_1\n  artifact_type_input: json\n  artifact_type_output: json\n  request_data:\n    user_prompt:\n      type: string\n      required: true\n      description: The prompt the caller sent, forwarded unchanged.\n- port_name: branch_2\n  artifact_type_input: json\n  artifact_type_output: json\n  request_data:\n    user_prompt:\n      type: string\n      required: true\n      description: The prompt the caller sent, forwarded unchanged.\npolicy_ports:\n- port_name: policy\n  artifact_type_input: none\n  artifact_type_output: none\n  response_data:\n    next_state: string - The branch port name to route to.\n    match_reason: string - Human-readable reason the branch matched.\ninput_parameters:\n- name: branches\n  type: text_long\n  label: Branch Conditions\n  default: '[]'\n  description: 'JSON array of routing rules. Each entry is {\"port_name\", \"field\",\n    \"operator\", \"value\"} and the first match wins.\n\n    '\n- name: default_branch\n  type: text\n  label: Default Branch\n  default: branch_1\n  description: Branch port to use when no condition matches.\n",
+    "ports": [
+     {
+      "direction": "IN",
+      "key": "input",
+      "label": "Input",
+      "port_type": "in",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "optional(json)",
+      "artifact_type_output": "json",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     },
+     {
+      "direction": "OUT",
+      "key": "branch_1",
+      "label": "Branch 1",
+      "port_type": "state",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": {
+       "user_prompt": {
+        "description": "The prompt the caller sent, forwarded unchanged.",
+        "required": true,
+        "type": "string"
+       }
+      },
+      "response_data_schema": null,
+      "artifact_type_input": "none",
+      "artifact_type_output": "json",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     },
+     {
+      "direction": "OUT",
+      "key": "branch_2",
+      "label": "Branch 2",
+      "port_type": "state",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": {
+       "user_prompt": {
+        "description": "The prompt the caller sent, forwarded unchanged.",
+        "required": true,
+        "type": "string"
+       }
+      },
+      "response_data_schema": null,
+      "artifact_type_input": "none",
+      "artifact_type_output": "json",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     },
+     {
+      "direction": "OUT",
+      "key": "policy",
+      "label": "Policy",
+      "port_type": "policy",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "none",
+      "artifact_type_output": "none",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+   },
+   "comp_2": {
+    "asset_id": null,
+    "name": "Conditional Router Policy (Internal)",
+    "category": "POLICY",
+    "description": "Internal policy that evaluates branch conditions. Part of the Conditional Router layer+policy pair.",
+    "short_description": null,
+    "tags": [],
+    "config": {
+     "detected_endpoints": [],
+     "is_agent_tool_internal": true
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\n\n\ndef _evaluate(actual, operator, expected):\n    \"\"\"Evaluate a single condition.\"\"\"\n    if actual is None:\n        return False\n\n    actual_str = str(actual)\n    expected_str = str(expected)\n\n    if operator == \"equals\":\n        return actual_str.lower() == expected_str.lower()\n    elif operator == \"not_equals\":\n        return actual_str.lower() != expected_str.lower()\n    elif operator == \"contains\":\n        return expected_str.lower() in actual_str.lower()\n    elif operator == \"starts_with\":\n        return actual_str.lower().startswith(expected_str.lower())\n    elif operator == \"greater_than\":\n        try:\n            return float(actual) > float(expected)\n        except (ValueError, TypeError):\n            return False\n    elif operator == \"greater_than_or_equal\":\n        try:\n            return float(actual) >= float(expected)\n        except (ValueError, TypeError):\n            return False\n    elif operator == \"less_than\":\n        try:\n            return float(actual) < float(expected)\n        except (ValueError, TypeError):\n            return False\n    elif operator == \"less_than_or_equal\":\n        try:\n            return float(actual) <= float(expected)\n        except (ValueError, TypeError):\n            return False\n    else:\n        perceivo.log.warning(f\"Unknown operator: {operator}, treating as no match\")\n        return False\n\n\n\n@perceivo.policy\nasync def conditional_router_policy_internal(input: perceivo.primitives.PolicyInput) -> perceivo.primitives.PolicyOutput:\n    request_data = input.request_data or {}\n\n    # Branch config is passed from the Layer in request_data\n    branches = request_data.get(\"branches\", [])\n    default_branch = request_data.get(\"default_branch\", \"branch_1\")\n    data = request_data.get(\"data\", {})\n\n    perceivo.log.info(\n        f\"Evaluating {len(branches)} conditions\",\n        default_branch=default_branch,\n        data_keys=list(data.keys()) if isinstance(data, dict) else [],\n    )\n\n    # Evaluate conditions in order -- first match wins\n    target = default_branch\n    match_reason = \"default (no conditions matched)\"\n\n    for branch in branches:\n        port_name = branch.get(\"port_name\", \"\")\n        field = branch.get(\"field\", \"\")\n        operator = branch.get(\"operator\", \"equals\")\n        expected = branch.get(\"value\", \"\")\n\n        actual = data.get(field) if isinstance(data, dict) else None\n\n        if _evaluate(actual, operator, expected):\n            target = port_name\n            match_reason = f\"{field} {operator} {expected}\"\n            perceivo.log.info(f\"Condition matched: {match_reason} -> {target}\")\n            break\n\n    perceivo.log.info(f\"Decision: route to {target} ({match_reason})\")\n\n    return perceivo.primitives.PolicyOutput(\n        next_state=target,\n        response_data={\n            \"next_state\": target,\n            \"match_reason\": match_reason,\n        }\n    )\n",
+    "manifest_yaml": "extension_type: policy\nname: Conditional Router Policy\ndescription: 'Internal routing policy for the Conditional Router. Evaluates the configured\n  branch conditions in order and names the first branch that matches.\n\n  '\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: none\n  artifact_type_output: none\n  request_data:\n    data: object (optional) - The payload to test the conditions against.\n    branches: array (optional) - Ordered field/operator/value rules.\n    default_branch: string (optional) - Branch to use when nothing matches.\n  response_data:\n    next_state: string - The branch port name that won.\n    match_reason: string - Why it won, or a note that the default was used.\npolicy_states:\n- branch_1\n- branch_2\n",
+    "ports": [
+     {
+      "direction": "IN",
+      "key": "input",
+      "label": "Input",
+      "port_type": "in",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "json",
+      "artifact_type_output": "none",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+   },
+   "comp_3": {
+    "asset_id": "578faa53-4674-4c5f-8be1-e4794c580cdf",
+    "name": "CONDITIONAL ROUTER - END (SYSTEM, READ-ONLY)",
+    "category": "END",
+    "description": "What it does The exit of the Conditional Router template. It returns whatever the chosen branch produced.\n\nHow it works Takes the data reaching it from the branch that ran and returns it as the result of the nested run, so the parent flow continues with it. It adds nothing of its own.\n\nConfigure Nothing.\n\nIn and out In: the output of the branch that ran. Out: the same data, as the template's result.\n\nUse it when It comes with the Conditional Router template. You do not add it separately.",
+    "short_description": "The exit of the Conditional Router template. It returns whatever the chosen branch produced.",
+    "tags": [],
+    "config": {
+     "detected_endpoints": [],
+     "is_generic_end": true,
+     "output_parameters": {
+      "declarations": [],
+      "values": {}
+     },
+     "port_order": [
+      "input",
+      "external_output"
+     ]
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "script": "import perceivo\r\n\r\n\r\n@perceivo.end\r\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\r\n    return perceivo.primitives.EndOutput(\r\n        artifact=None,\r\n        response_data=input.response_data or {},\r\n    )\r\n",
+    "manifest_yaml": "extension_type: end\r\nname: Generic End (Prebuilt)\r\ndescription: Passthrough end component. Define output contract via Inspector.\r\ninput_ports:\r\n- port_name: input\r\n  port_type: in\r\n  artifact_type_input: json\r\n  artifact_type_output: json\r\n  request_data:\r\n    routed_to: string - The branch port name the policy selected.\r\n    match_reason: string - Human-readable reason that branch matched.\r\n    branch_response: object (optional) - response_data returned by the invoked branch.\r\nexternal_out_port:\r\n  port_name: external_output\r\n  port_type: external_out\r\n  artifact_type_input: json\r\n  artifact_type_output: json\r\n  response_data_contract: dynamic\r\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\r\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\r\ninput_parameters: []\r\n",
+    "ports": [
+     {
+      "direction": "IN",
+      "key": "input",
+      "label": "Input",
+      "port_type": "in",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "json",
+      "artifact_type_output": "json",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     },
+     {
+      "direction": "OUT",
+      "key": "external_output",
+      "label": "External Output",
+      "port_type": "external_out",
+      "contract": {},
+      "tool_call": false,
+      "post_tool_contract": null,
+      "base_schema": null,
+      "artifact_type_constraint": null,
+      "allowed_states": null,
+      "request_data_schema": null,
+      "response_data_schema": null,
+      "artifact_type_input": "json",
+      "artifact_type_output": "json",
+      "artifact_input_schema": null,
+      "artifact_output_schema": null,
+      "multi_artifact": false,
+      "artifact_types": null,
+      "response_data_passthrough": null,
+      "response_data_passthrough_except": null,
+      "response_data_contract": null
+     }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+   }
+  },
+  "nodes": [
+   {
+    "local_id": "node_11",
+    "component_ref": "comp_0",
+    "component_asset_id": "9ea566bf-677d-4a8a-8d0f-308280a2a5dc",
+    "name": "Conditional Router - Start",
+    "position": {
+     "x": 786.0,
+     "y": 220.0
+    },
+    "config": null
+   },
+   {
+    "local_id": "node_5",
+    "component_ref": "comp_1",
+    "component_asset_id": null,
+    "name": "Conditional Router (Prebuilt)",
+    "position": {
+     "x": 1026.0,
+     "y": 220.0
+    },
+    "config": {
+     "extension_id": "8ebc8699-6305-431f-acbe-b799355568b8",
+     "fsm": {
+      "max_steps": 1
+     },
+     "input_parameters": {
+      "declarations": [
+       {
+        "default": "[]",
+        "description": "JSON array of branch conditions.",
+        "label": "Branch Configuration",
+        "name": "branches",
+        "required": false,
+        "type": "text_long"
+       },
+       {
+        "default": "branch_1",
+        "description": "Port name to invoke when no conditions match.",
+        "label": "Default Branch",
+        "name": "default_branch",
+        "type": "text"
+       }
+      ],
+      "values": {
+       "branches": "[{\"port_name\": \"branch_1\", \"field\": \"predicted_orchestration_id\", \"operator\": \"equals\", \"value\": \"@member:Company Policy Chatbot - RAG\"}, {\"port_name\": \"branch_2\", \"field\": \"predicted_orchestration_id\", \"operator\": \"equals\", \"value\": \"@member:Company Policy Chatbot - Plain\"}]",
+       "default_branch": "branch_2"
+      }
+     },
+     "is_conditional_router": true,
+     "port_order": [
+      "",
+      "",
+      "",
+      ""
+     ],
+     "port_sides": {
+      "": "left"
+     },
+     "template_source_id": "00000000-0000-0000-0002-000000000001",
+     "mainflow_target_node_ref": "node_12"
+    }
+   },
+   {
+    "local_id": "node_1",
+    "component_ref": "comp_2",
+    "component_asset_id": null,
+    "name": null,
+    "position": {
+     "x": 726.0,
+     "y": 20.0
+    },
+    "config": {
+     "extension_id": "20c41f68-6ce1-4603-b19b-1427566181e3",
+     "is_agent_tool_internal": true,
+     "port_sides": {
+      "": "right"
+     },
+     "template_source_id": "00000000-0000-0000-0002-000000000010"
+    }
+   },
+   {
+    "local_id": "node_4",
+    "component_ref": "orch_plain",
+    "component_asset_id": null,
+    "name": "Orch 20 -- Plain LLM Chatbot v2 (Company Policy Chatbot)",
+    "position": {
+     "x": 1035.0,
+     "y": 29.0
+    },
+    "config": {
+     "extension_id": "6876f485-cfab-4404-befb-f1d6dfe5699d",
+     "port_sides": {
+      "": "bottom"
+     }
+    },
+    "orchestration_asset_id": "@member:Company Policy Chatbot - Plain"
+   },
+   {
+    "local_id": "node_6",
+    "component_ref": "orch_rag",
+    "component_asset_id": null,
+    "name": "Orch 21 -- RAG Chatbot (Company Policy Chatbot)",
+    "position": {
+     "x": 735.0,
+     "y": 229.0
+    },
+    "config": {
+     "extension_id": "5592d2af-79ac-4dd9-a69c-0c8a42ccf23b",
+     "is_template": true,
+     "port_sides": {
+      "": "right"
+     }
+    },
+    "orchestration_asset_id": "@member:Company Policy Chatbot - RAG"
+   },
+   {
+    "local_id": "node_12",
+    "component_ref": "comp_3",
+    "component_asset_id": "578faa53-4674-4c5f-8be1-e4794c580cdf",
+    "name": "Conditional Router - End",
+    "position": {
+     "x": 1266.0,
+     "y": 220.0
+    },
+    "config": null
+   }
+  ],
+  "ports": [
+   {
+    "node_ref": "node_11",
+    "component_port_key": "output",
+    "component_port_direction": "OUT",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_11",
+    "component_port_key": "external_input",
+    "component_port_direction": "IN",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_5",
+    "component_port_key": "policy",
+    "component_port_direction": "OUT",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_5",
+    "component_port_key": "branch_1",
+    "component_port_direction": "OUT",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_5",
+    "component_port_key": "branch_2",
+    "component_port_direction": "OUT",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_5",
+    "component_port_key": "input",
+    "component_port_direction": "IN",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_1",
+    "component_port_key": "input",
+    "component_port_direction": "IN",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_4",
+    "component_port_key": "orchestration",
+    "component_port_direction": "IN",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_6",
+    "component_port_key": "orchestration",
+    "component_port_direction": "IN",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_12",
+    "component_port_key": "input",
+    "component_port_direction": "IN",
+    "alias": null,
+    "effective_contract": null
+   },
+   {
+    "node_ref": "node_12",
+    "component_port_key": "external_output",
+    "component_port_direction": "OUT",
+    "alias": null,
+    "effective_contract": null
+   }
+  ],
+  "edges": [
+   {
+    "source_port_index": 2,
+    "target_port_index": 6,
+    "edge_kind": "INVOKE"
+   },
+   {
+    "source_port_index": 4,
+    "target_port_index": 7,
+    "edge_kind": "INVOKE"
+   },
+   {
+    "source_port_index": 3,
+    "target_port_index": 8,
+    "edge_kind": "INVOKE"
+   },
+   {
+    "source_port_index": 0,
+    "target_port_index": 5,
+    "edge_kind": "MAINFLOW"
+   }
+  ],
+  "secrets_required": []
+ },
+ "members": [
+  {
+   "export_version": "1.0",
+   "export_type": "orchestration",
+   "exported_at": "2026-09-27T19:53:40.897352Z",
+   "orchestration": {
+    "name": "Company Policy Chatbot - Plain",
+    "description": "Scoring test: Prompt Shield -> Router -> (LLM Request | Rejection). No RAG. Uses Sequential Executor with flat accumulation.",
+    "tags": [],
+    "additional_packages": [],
+    "requires_gpu": false,
+    "runtime_config": {
+     "autoscale_enabled": true,
+     "cpu_limit": "1000m",
+     "cpu_request": "500m",
+     "gpu_limit": "0",
+     "gpu_request": "0",
+     "max_replicas": 3,
+     "memory_limit": "2Gi",
+     "memory_request": "512Mi",
+     "min_replicas": 1
+    },
+    "disable_intermediate_snapshots": false
+   },
+   "secrets_required": [],
+   "components": {
+    "comp_0": {
+     "asset_id": null,
+     "name": "Chatbot End",
+     "category": "END",
+     "description": "Capability end component that passes through TEXT artifact and extracts token metadata.",
+     "short_description": null,
+     "tags": [],
+     "config": {
+      "detected_endpoints": [],
+      "icon": {
+       "type": "lucide",
+       "value": "square"
+      },
+      "is_generic_end": true,
+      "output_parameters": {
+       "declarations": [],
+       "values": {}
+      }
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "\nimport perceivo\n\n\n@perceivo.end\nasync def chatbot_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    rd = input.response_data or {}\n    return perceivo.primitives.EndOutput(\n        artifact=input.artifact,\n        response_data={\n            \"tokens_in\": rd.get(\"tokens_in\", 0),\n            \"tokens_out\": rd.get(\"tokens_out\", 0),\n        },\n    )\n",
+     "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: text\n  artifact_type_output: json\n  response_data: &id001\n    tokens_in:\n      type: integer\n      required: false\n    tokens_out:\n      type: integer\n      required: false\n  request_data:\n    tokens_in:\n      type: integer\n      required: false\n    tokens_out:\n      type: integer\n      required: false\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data: *id001\ninput_parameters: []\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "input",
+       "label": "Input",
+       "port_type": "in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": null,
+       "artifact_type_input": "text",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      },
+      {
+       "direction": "OUT",
+       "key": "external_output",
+       "label": "External Output",
+       "port_type": "external_out",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    },
+    "comp_1": {
+     "asset_id": null,
+     "name": "LLM Response Adapter",
+     "category": "ADAPTER",
+     "description": "Extracts the LLM response text and token counts from the Sequential Executor's namespaced output and produces a TEXT artifact.",
+     "short_description": null,
+     "tags": [
+      "adapter",
+      "llm",
+      "response-extractor"
+     ],
+     "config": {
+      "detected_endpoints": [],
+      "input_parameters": {
+       "declarations": [
+        {
+         "default": "state_2",
+         "label": "Response State",
+         "name": "response_state",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.response",
+         "label": "Response Path",
+         "name": "response_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_in",
+         "label": "Tokens In Path",
+         "name": "tokens_in_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_out",
+         "label": "Tokens Out Path",
+         "name": "tokens_out_path",
+         "type": "text"
+        }
+       ],
+       "values": {}
+      }
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "\n\"\"\"\nLLM Response Adapter\n\nExtracts the LLM response text and token counts from the Sequential Executor's\nnamespaced output and produces a TEXT artifact suitable for the End component.\n\nExpects the SE output structure:\n  {input: {...}, state_1: {...}, state_2: {...}}\nwhere state_2 is a Conditional Router returning:\n  {routed_to, match_reason, branch_response: {response, tokens_in, tokens_out, ...}}\n\nA configured path that MISSES is an error, not an empty answer. The path names\nthe success branch; a refused prompt is published by the router's rejection\nbranch instead, so the adapter tries that shape too and RAISES when neither\ncarries text. Emitting \"\" made a blocked prompt indistinguishable from a real\nreply -- a COMPLETED run with a 0-byte artifact.\n\nConfigurable fields:\n  response_state: which SE state contains the final response (default: state_2)\n  response_path: dot-separated path to the response text within the state\n    (default: branch_response.response)\n  tokens_in_path: dot-separated path to tokens_in (default: branch_response.tokens_in)\n  tokens_out_path: dot-separated path to tokens_out (default: branch_response.tokens_out)\n\n@extension_type: adapter\n\n@input_ports:\n  - port_name: input\n    port_type: in\n\n@output_ports:\n  - port_name: output\n    port_type: state\n\n@input_parameters:\n  - name: response_state\n    type: text\n    label: Response State\n    default: \"state_2\"\n  - name: response_path\n    type: text\n    label: Response Path\n    default: \"branch_response.response\"\n  - name: tokens_in_path\n    type: text\n    label: Tokens In Path\n    default: \"branch_response.tokens_in\"\n  - name: tokens_out_path\n    type: text\n    label: Tokens Out Path\n    default: \"branch_response.tokens_out\"\n\"\"\"\n\nENTRY_CLASS = \"LLMResponseAdapter\"\n\nimport perceivo\n\n\ndef _resolve_path(data, path):\n    \"\"\"Walk a dot-separated path into a nested dict.\"\"\"\n    current = data\n    for key in path.split(\".\"):\n        if isinstance(current, dict):\n            current = current.get(key)\n        else:\n            return None\n    return current\n\n\nclass LLMResponseAdapter(perceivo.primitives.Adapter):\n\n    async def run(self, input: perceivo.primitives.AdapterInput) -> perceivo.primitives.AdapterOutput:\n        rd = input.request_data or {}\n\n        response_state = perceivo.params.get(\"response_state\", \"state_2\")\n        response_path = perceivo.params.get(\"response_path\", \"branch_response.response\")\n        tokens_in_path = perceivo.params.get(\"tokens_in_path\", \"branch_response.tokens_in\")\n        tokens_out_path = perceivo.params.get(\"tokens_out_path\", \"branch_response.tokens_out\")\n\n        state_data = rd.get(response_state, {})\n        if not isinstance(state_data, dict):\n            state_data = {}\n\n        # The configured path is the SUCCESS path, and it is the only one a\n        # member's config can name. Both members hand this adapter the\n        # Sequential Executor's namespaced output, so response_state is the\n        # state holding the Conditional Router's result and the path below it\n        # differs per arm: the Plain member answers at\n        # branch_response.response, and the RAG member answers at\n        # branch_response.state_3.response, one executor deeper because the\n        # router's safe branch is itself a Sequential Executor.\n        #\n        # A REFUSED prompt never travels either path. The router's rejection\n        # branch publishes its message at branch_response.response with no\n        # executor state beneath it, which is why that shape is tried under\n        # response_state as well -- a refusal is an ANSWER here, not a miss.\n        # This adapter used to substitute \"\" when nothing resolved, producing a\n        # COMPLETED run with a 0-byte artifact: the exact shape a blocked prompt\n        # must never be reported as. It raises instead.\n        candidates = [\n            (response_state, response_path),\n            (response_state, \"branch_response.response\"),\n            (response_state, \"response\"),\n            (\"branch_response\", \"response\"),\n            (\"branch_response\", response_path),\n        ]\n        response_text = \"\"\n        resolved_from = None\n        for state_key, path in candidates:\n            container = rd.get(state_key)\n            if not isinstance(container, dict):\n                continue\n            value = _resolve_path(container, path)\n            if value is not None and str(value).strip():\n                response_text = str(value)\n                resolved_from = state_key + \".\" + path\n                break\n\n        if not response_text.strip():\n            # Loud, not empty. An adapter that cannot find an answer has not\n            # produced one, and a green COMPLETED carrying nothing is worse\n            # than a failure: nothing downstream can tell it from a real reply.\n            raise RuntimeError(\n                \"LLM_RESPONSE_ADAPTER_EMPTY: no response text at any of \"\n                + \", \".join(s + \".\" + p for s, p in candidates)\n                + \"; request_data keys=\" + str(sorted(rd.keys()))\n            )\n\n        tokens_in = _resolve_path(state_data, tokens_in_path)\n        if tokens_in is None:\n            tokens_in = 0\n        tokens_in = int(tokens_in)\n\n        tokens_out = _resolve_path(state_data, tokens_out_path)\n        if tokens_out is None:\n            tokens_out = 0\n        tokens_out = int(tokens_out)\n\n        perceivo.log.info(\n            f\"LLMResponseAdapter: state={response_state}, \"\n            f\"resolved_from={resolved_from}, \"\n            f\"response_len={len(response_text)}, \"\n            f\"tokens_in={tokens_in}, tokens_out={tokens_out}\"\n        )\n\n        return perceivo.primitives.AdapterOutput(\n            artifact=perceivo.primitives.Artifact(\n                type=perceivo.primitives.ArtifactType.TEXT,\n                data=response_text,\n                mime_type=\"text/plain\",\n            ),\n            response_data={\n                \"tokens_in\": tokens_in,\n                \"tokens_out\": tokens_out,\n            },\n        )\n",
+     "manifest_yaml": "extension_type: adapter\nname: LLM Response Adapter\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: text\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: none\n  artifact_type_output: text\n  response_data:\n    tokens_in:\n      type: object\n      required: false\n      description: Seed bundle field\n    tokens_out:\n      type: object\n      required: false\n      description: Seed bundle field\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "input",
+       "label": "Input",
+       "port_type": "in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "input": {
+         "required": false,
+         "type": "object"
+        },
+        "state_1": {
+         "required": false,
+         "type": "object"
+        },
+        "state_2": {
+         "required": false,
+         "type": "object"
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "optional(json)",
+       "artifact_type_output": "text",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    },
+    "comp_2": {
+     "asset_id": null,
+     "name": "Generic Start",
+     "category": "START",
+     "description": "Passthrough start component. Define the input contract directly in the Inspector — no code required.",
+     "short_description": null,
+     "tags": [],
+     "config": {
+      "detected_endpoints": [],
+      "extension_id": "00000000-0000-0000-0004-000000000001",
+      "input_parameters": {
+       "declarations": [
+        {
+         "label": "User Prompt",
+         "name": "user_prompt",
+         "type": "text_long"
+        }
+       ]
+      },
+      "is_generic_start": true,
+      "port_order": [
+       "external_input",
+       "output"
+      ]
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "ENTRY_CLASS = \"GenericStart\"\n\nimport perceivo\n\n\nclass GenericStart(perceivo.primitives.Start):\n    async def start(self, input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n        return perceivo.primitives.StartOutput(\n            artifact=input.artifact,\n            response_data=input.request_data or {},\n        )\n",
+     "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded\n    from the run''s own data, whose fields are supplied by the orchestration at run\n    time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "external_input",
+       "label": "External Input",
+       "port_type": "external_in",
+       "contract": {
+        "properties": {
+         "user_prompt": {
+          "type": "text_long"
+         }
+        },
+        "type": "object"
+       },
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "user_prompt": {
+         "required": false,
+         "type": "string"
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      },
+      {
+       "direction": "OUT",
+       "key": "output",
+       "label": "Output",
+       "port_type": "out",
+       "contract": {
+        "properties": {
+         "user_prompt": {
+          "type": "text_long"
+         }
+        },
+        "type": "object"
+       },
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "user_prompt": {
+         "required": false,
+         "type": "string"
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    }
+   },
+   "nodes": [
+    {
+     "local_id": "node_2",
+     "component_ref": "comp_0",
+     "component_asset_id": null,
+     "name": "Chatbot End",
+     "position": {
+      "x": 1379.0,
+      "y": 36.0
+     },
+     "config": {
+      "extension_id": "0ac148ed-a1fb-452e-8e23-9b897da0d238",
+      "is_generic_end": true,
+      "is_prebuilt": true,
+      "is_template": true,
+      "output_parameters": {
+       "declarations": [],
+       "values": {}
+      }
+     }
+    },
+    {
+     "local_id": "node_9",
+     "component_ref": "comp_1",
+     "component_asset_id": null,
+     "name": "LLM Response Adapter",
+     "position": {
+      "x": 1695.0,
+      "y": 20.0
+     },
+     "config": {
+      "extension_id": "14c46f2b-d22e-407d-b0a5-6201c764df73",
+      "input_parameters": {
+       "declarations": [
+        {
+         "default": "state_2",
+         "label": "Response State",
+         "name": "response_state",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.response",
+         "label": "Response Path",
+         "name": "response_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_in",
+         "label": "Tokens In Path",
+         "name": "tokens_in_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_out",
+         "label": "Tokens Out Path",
+         "name": "tokens_out_path",
+         "type": "text"
+        }
+       ],
+       "values": {
+        "response_path": "branch_response.response",
+        "response_state": "state_2",
+        "tokens_in_path": "branch_response.tokens_in",
+        "tokens_out_path": "branch_response.tokens_out"
+       }
+      },
+      "mainflow_target_node_ref": "node_2",
+      "port_sides": {
+       "": "left"
+      }
+     }
+    },
+    {
+     "local_id": "node_10",
+     "component_ref": "comp_2",
+     "component_asset_id": null,
+     "name": "Generic Start",
+     "position": {
+      "x": 50.0,
+      "y": 236.0
+     },
+     "config": {
+      "extension_id": "e328e64a-c3d2-4904-87f9-66c9754cf8df",
+      "input_parameters": {
+       "declarations": [
+        {
+         "label": "User Prompt",
+         "name": "user_prompt",
+         "type": "text_long"
+        }
+       ]
+      },
+      "is_generic_start": true,
+      "is_prebuilt": true,
+      "is_template": true
+     }
+    }
+   ],
+   "ports": [
+    {
+     "node_ref": "node_2",
+     "component_port_key": "external_output",
+     "component_port_direction": "OUT",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_2",
+     "component_port_key": "input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_9",
+     "component_port_key": "input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_10",
+     "component_port_key": "output",
+     "component_port_direction": "OUT",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_10",
+     "component_port_key": "external_input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    }
+   ],
+   "edges": [
+    {
+     "source_port_index": 3,
+     "target_port_index": 2,
+     "edge_kind": "MAINFLOW"
+    }
+   ]
+  },
+  {
+   "export_version": "1.0",
+   "export_type": "orchestration",
+   "exported_at": "2026-09-27T19:56:21.762045Z",
+   "orchestration": {
+    "name": "Company Policy Chatbot - RAG",
+    "description": "Answers policy questions using RAG (retrieval from Milvus). Includes Prompt Shield safety gate.",
+    "tags": [],
+    "additional_packages": [],
+    "requires_gpu": false,
+    "runtime_config": {
+     "autoscale_enabled": true,
+     "cpu_limit": "1000m",
+     "cpu_request": "500m",
+     "gpu_limit": "0",
+     "gpu_request": "0",
+     "max_replicas": 3,
+     "memory_limit": "2Gi",
+     "memory_request": "512Mi",
+     "min_replicas": 1
+    },
+    "disable_intermediate_snapshots": false
+   },
+   "secrets_required": [],
+   "components": {
+    "comp_0": {
+     "asset_id": null,
+     "name": "Chatbot End",
+     "category": "END",
+     "description": "Capability end component that passes through TEXT artifact and extracts token metadata.",
+     "short_description": null,
+     "tags": [],
+     "config": {
+      "detected_endpoints": [],
+      "icon": {
+       "type": "lucide",
+       "value": "square"
+      },
+      "is_generic_end": true,
+      "output_parameters": {
+       "declarations": [],
+       "values": {}
+      }
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "\nimport perceivo\n\n\n@perceivo.end\nasync def chatbot_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    rd = input.response_data or {}\n    return perceivo.primitives.EndOutput(\n        artifact=input.artifact,\n        response_data={\n            \"tokens_in\": rd.get(\"tokens_in\", 0),\n            \"tokens_out\": rd.get(\"tokens_out\", 0),\n        },\n    )\n",
+     "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: text\n  artifact_type_output: json\n  response_data: &id001\n    tokens_in:\n      type: integer\n      required: false\n    tokens_out:\n      type: integer\n      required: false\n  request_data:\n    tokens_in:\n      type: integer\n      required: false\n    tokens_out:\n      type: integer\n      required: false\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data: *id001\ninput_parameters: []\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "input",
+       "label": "Input",
+       "port_type": "in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": null,
+       "artifact_type_input": "text",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      },
+      {
+       "direction": "OUT",
+       "key": "external_output",
+       "label": "External Output",
+       "port_type": "external_out",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    },
+    "comp_1": {
+     "asset_id": null,
+     "name": "LLM Response Adapter",
+     "category": "ADAPTER",
+     "description": "Extracts the LLM response text and token counts from the Sequential Executor's namespaced output and produces a TEXT artifact.",
+     "short_description": null,
+     "tags": [
+      "adapter",
+      "llm",
+      "response-extractor"
+     ],
+     "config": {
+      "detected_endpoints": [],
+      "input_parameters": {
+       "declarations": [
+        {
+         "default": "state_2",
+         "label": "Response State",
+         "name": "response_state",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.response",
+         "label": "Response Path",
+         "name": "response_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_in",
+         "label": "Tokens In Path",
+         "name": "tokens_in_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_out",
+         "label": "Tokens Out Path",
+         "name": "tokens_out_path",
+         "type": "text"
+        }
+       ],
+       "values": {}
+      }
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "\n\"\"\"\nLLM Response Adapter\n\nExtracts the LLM response text and token counts from the Sequential Executor's\nnamespaced output and produces a TEXT artifact suitable for the End component.\n\nExpects the SE output structure:\n  {input: {...}, state_1: {...}, state_2: {...}}\nwhere state_2 is a Conditional Router returning:\n  {routed_to, match_reason, branch_response: {response, tokens_in, tokens_out, ...}}\n\nA configured path that MISSES is an error, not an empty answer. The path names\nthe success branch; a refused prompt is published by the router's rejection\nbranch instead, so the adapter tries that shape too and RAISES when neither\ncarries text. Emitting \"\" made a blocked prompt indistinguishable from a real\nreply -- a COMPLETED run with a 0-byte artifact.\n\nConfigurable fields:\n  response_state: which SE state contains the final response (default: state_2)\n  response_path: dot-separated path to the response text within the state\n    (default: branch_response.response)\n  tokens_in_path: dot-separated path to tokens_in (default: branch_response.tokens_in)\n  tokens_out_path: dot-separated path to tokens_out (default: branch_response.tokens_out)\n\n@extension_type: adapter\n\n@input_ports:\n  - port_name: input\n    port_type: in\n\n@output_ports:\n  - port_name: output\n    port_type: state\n\n@input_parameters:\n  - name: response_state\n    type: text\n    label: Response State\n    default: \"state_2\"\n  - name: response_path\n    type: text\n    label: Response Path\n    default: \"branch_response.response\"\n  - name: tokens_in_path\n    type: text\n    label: Tokens In Path\n    default: \"branch_response.tokens_in\"\n  - name: tokens_out_path\n    type: text\n    label: Tokens Out Path\n    default: \"branch_response.tokens_out\"\n\"\"\"\n\nENTRY_CLASS = \"LLMResponseAdapter\"\n\nimport perceivo\n\n\ndef _resolve_path(data, path):\n    \"\"\"Walk a dot-separated path into a nested dict.\"\"\"\n    current = data\n    for key in path.split(\".\"):\n        if isinstance(current, dict):\n            current = current.get(key)\n        else:\n            return None\n    return current\n\n\nclass LLMResponseAdapter(perceivo.primitives.Adapter):\n\n    async def run(self, input: perceivo.primitives.AdapterInput) -> perceivo.primitives.AdapterOutput:\n        rd = input.request_data or {}\n\n        response_state = perceivo.params.get(\"response_state\", \"state_2\")\n        response_path = perceivo.params.get(\"response_path\", \"branch_response.response\")\n        tokens_in_path = perceivo.params.get(\"tokens_in_path\", \"branch_response.tokens_in\")\n        tokens_out_path = perceivo.params.get(\"tokens_out_path\", \"branch_response.tokens_out\")\n\n        state_data = rd.get(response_state, {})\n        if not isinstance(state_data, dict):\n            state_data = {}\n\n        # The configured path is the SUCCESS path, and it is the only one a\n        # member's config can name. Both members hand this adapter the\n        # Sequential Executor's namespaced output, so response_state is the\n        # state holding the Conditional Router's result and the path below it\n        # differs per arm: the Plain member answers at\n        # branch_response.response, and the RAG member answers at\n        # branch_response.state_3.response, one executor deeper because the\n        # router's safe branch is itself a Sequential Executor.\n        #\n        # A REFUSED prompt never travels either path. The router's rejection\n        # branch publishes its message at branch_response.response with no\n        # executor state beneath it, which is why that shape is tried under\n        # response_state as well -- a refusal is an ANSWER here, not a miss.\n        # This adapter used to substitute \"\" when nothing resolved, producing a\n        # COMPLETED run with a 0-byte artifact: the exact shape a blocked prompt\n        # must never be reported as. It raises instead.\n        candidates = [\n            (response_state, response_path),\n            (response_state, \"branch_response.response\"),\n            (response_state, \"response\"),\n            (\"branch_response\", \"response\"),\n            (\"branch_response\", response_path),\n        ]\n        response_text = \"\"\n        resolved_from = None\n        for state_key, path in candidates:\n            container = rd.get(state_key)\n            if not isinstance(container, dict):\n                continue\n            value = _resolve_path(container, path)\n            if value is not None and str(value).strip():\n                response_text = str(value)\n                resolved_from = state_key + \".\" + path\n                break\n\n        if not response_text.strip():\n            # Loud, not empty. An adapter that cannot find an answer has not\n            # produced one, and a green COMPLETED carrying nothing is worse\n            # than a failure: nothing downstream can tell it from a real reply.\n            raise RuntimeError(\n                \"LLM_RESPONSE_ADAPTER_EMPTY: no response text at any of \"\n                + \", \".join(s + \".\" + p for s, p in candidates)\n                + \"; request_data keys=\" + str(sorted(rd.keys()))\n            )\n\n        tokens_in = _resolve_path(state_data, tokens_in_path)\n        if tokens_in is None:\n            tokens_in = 0\n        tokens_in = int(tokens_in)\n\n        tokens_out = _resolve_path(state_data, tokens_out_path)\n        if tokens_out is None:\n            tokens_out = 0\n        tokens_out = int(tokens_out)\n\n        perceivo.log.info(\n            f\"LLMResponseAdapter: state={response_state}, \"\n            f\"resolved_from={resolved_from}, \"\n            f\"response_len={len(response_text)}, \"\n            f\"tokens_in={tokens_in}, tokens_out={tokens_out}\"\n        )\n\n        return perceivo.primitives.AdapterOutput(\n            artifact=perceivo.primitives.Artifact(\n                type=perceivo.primitives.ArtifactType.TEXT,\n                data=response_text,\n                mime_type=\"text/plain\",\n            ),\n            response_data={\n                \"tokens_in\": tokens_in,\n                \"tokens_out\": tokens_out,\n            },\n        )\n",
+     "manifest_yaml": "extension_type: adapter\nname: LLM Response Adapter\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: text\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: none\n  artifact_type_output: text\n  response_data:\n    tokens_in:\n      type: object\n      required: false\n      description: Seed bundle field\n    tokens_out:\n      type: object\n      required: false\n      description: Seed bundle field\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "input",
+       "label": "Input",
+       "port_type": "in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "input": {
+         "required": false,
+         "type": "object"
+        },
+        "state_1": {
+         "required": false,
+         "type": "object"
+        },
+        "state_2": {
+         "required": false,
+         "type": "object"
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "optional(json)",
+       "artifact_type_output": "text",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    },
+    "comp_2": {
+     "asset_id": null,
+     "name": "Generic Start",
+     "category": "START",
+     "description": "Passthrough start component. Define the input contract directly in the Inspector — no code required.",
+     "short_description": null,
+     "tags": [],
+     "config": {
+      "detected_endpoints": [],
+      "extension_id": "00000000-0000-0000-0004-000000000001",
+      "input_parameters": {
+       "declarations": [
+        {
+         "label": "User Prompt",
+         "name": "user_prompt",
+         "type": "text_long"
+        }
+       ]
+      },
+      "is_generic_start": true,
+      "port_order": [
+       "external_input",
+       "output"
+      ]
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "ENTRY_CLASS = \"GenericStart\"\n\nimport perceivo\n\n\nclass GenericStart(perceivo.primitives.Start):\n    async def start(self, input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n        return perceivo.primitives.StartOutput(\n            artifact=input.artifact,\n            response_data=input.request_data or {},\n        )\n",
+     "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded\n    from the run''s own data, whose fields are supplied by the orchestration at run\n    time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "external_input",
+       "label": "External Input",
+       "port_type": "external_in",
+       "contract": {
+        "properties": {
+         "user_prompt": {
+          "type": "text_long"
+         }
+        },
+        "type": "object"
+       },
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "user_prompt": {
+         "required": false,
+         "type": "string"
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      },
+      {
+       "direction": "OUT",
+       "key": "output",
+       "label": "Output",
+       "port_type": "out",
+       "contract": {
+        "properties": {
+         "user_prompt": {
+          "type": "text_long"
+         }
+        },
+        "type": "object"
+       },
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "user_prompt": {
+         "required": false,
+         "type": "string"
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": null,
+       "response_data_passthrough": null,
+       "response_data_passthrough_except": null,
+       "response_data_contract": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    }
+   },
+   "nodes": [
+    {
+     "local_id": "node_9",
+     "component_ref": "comp_0",
+     "component_asset_id": null,
+     "name": "Chatbot End",
+     "position": {
+      "x": 1310.0,
+      "y": 436.0
+     },
+     "config": {
+      "extension_id": "db046744-2bb7-4cff-89a8-81a99bb47108",
+      "is_generic_end": true,
+      "is_prebuilt": true,
+      "is_template": true,
+      "output_parameters": {
+       "declarations": [],
+       "values": {}
+      }
+     }
+    },
+    {
+     "local_id": "node_11",
+     "component_ref": "comp_1",
+     "component_asset_id": null,
+     "name": "LLM Response Adapter",
+     "position": {
+      "x": 726.0,
+      "y": 620.0
+     },
+     "config": {
+      "extension_id": "80a96671-8dff-4f0a-ba06-da628d4e7455",
+      "input_parameters": {
+       "declarations": [
+        {
+         "default": "state_2",
+         "label": "Response State",
+         "name": "response_state",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.response",
+         "label": "Response Path",
+         "name": "response_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_in",
+         "label": "Tokens In Path",
+         "name": "tokens_in_path",
+         "type": "text"
+        },
+        {
+         "default": "branch_response.tokens_out",
+         "label": "Tokens Out Path",
+         "name": "tokens_out_path",
+         "type": "text"
+        }
+       ],
+       "values": {
+        "response_path": "branch_response.state_3.response",
+        "response_state": "state_2",
+        "tokens_in_path": "branch_response.state_3.tokens_in",
+        "tokens_out_path": "branch_response.state_3.tokens_out"
+       }
+      },
+      "mainflow_target_node_ref": "node_9",
+      "port_sides": {
+       "": "left"
+      }
+     }
+    },
+    {
+     "local_id": "node_12",
+     "component_ref": "comp_2",
+     "component_asset_id": null,
+     "name": "Generic Start",
+     "position": {
+      "x": 50.0,
+      "y": 236.0
+     },
+     "config": {
+      "extension_id": "865bdb0c-643b-47fb-b518-a42963a71a85",
+      "input_parameters": {
+       "declarations": [
+        {
+         "label": "User Prompt",
+         "name": "user_prompt",
+         "type": "text_long"
+        }
+       ]
+      },
+      "is_generic_start": true,
+      "is_prebuilt": true
+     }
+    }
+   ],
+   "ports": [
+    {
+     "node_ref": "node_9",
+     "component_port_key": "external_output",
+     "component_port_direction": "OUT",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_9",
+     "component_port_key": "input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_11",
+     "component_port_key": "input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_12",
+     "component_port_key": "output",
+     "component_port_direction": "OUT",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_12",
+     "component_port_key": "external_input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    }
+   ],
+   "edges": [
+    {
+     "source_port_index": 3,
+     "target_port_index": 2,
+     "edge_kind": "MAINFLOW"
+    }
+   ]
+  }
+ ]
+}

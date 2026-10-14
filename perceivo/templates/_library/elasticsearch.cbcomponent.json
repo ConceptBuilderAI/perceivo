@@ -1,0 +1,214 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "ELASTICSEARCH (SYSTEM, READ-ONLY)",
+    "category": "AGENT",
+    "description": "What it does Stores documents in your organization's Elasticsearch and finds them again by full-text search - the backbone of a searchable knowledge base, a product catalog or a log of past runs.\n\nHow it works Each node runs one operation, chosen in the Inspector. The documents, queries, mappings and settings it needs arrive in the incoming data; the index name can be filled from that data too, with ${field} placeholders. SEARCH matches query_text across the fields you name, or runs a full query_dsl when one arrives. INSERT indexes the whole batch and fails the run if Elasticsearch rejects even one document, so a count is never reported for documents that are not there. Anything else arriving passes through to the next node.\n\nConfigure\n- Operation - SEARCH, INSERT, CREATE_INDEX, DELETE, LIST_INDICES or DELETE_INDEX.\n- Index Name - the index to act on; required for everything except LIST_INDICES.\n- Result Count - the most hits SEARCH returns, 1 to 1000.\n- Search Fields - comma-separated fields to match query_text against; blank searches them all.\n\nIn and out In: documents and optional doc_ids for INSERT; query_text or query_dsl for SEARCH; doc_id or query_dsl for DELETE; mappings and settings for CREATE_INDEX. Out: the incoming data, less those inputs, plus the operation, the index and its result - results and total, insert_count, deleted or indices.\n\nUse it when\n- You want people or agents to search your own documents by keyword.\n- An orchestration should file each result it produces so it can be found later.\n- You need to set up, inspect or clear an index as part of a pipeline.",
+    "short_description": "Indexes, searches and deletes documents in your organization's Elasticsearch.",
+    "tags": [
+      "template",
+      "search",
+      "elasticsearch"
+    ],
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "search"
+      },
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "top"
+      },
+      "input_parameters": {
+        "values": {
+          "operation": "SEARCH",
+          "index_name": "",
+          "top_k": 10,
+          "search_fields": ""
+        },
+        "declarations": [
+          {
+            "name": "operation",
+            "type": "select",
+            "label": "Operation",
+            "options": [
+              "SEARCH",
+              "INSERT",
+              "CREATE_INDEX",
+              "DELETE",
+              "LIST_INDICES",
+              "DELETE_INDEX"
+            ],
+            "default": "SEARCH",
+            "required": true,
+            "description": "The Elasticsearch operation this node runs."
+          },
+          {
+            "name": "index_name",
+            "type": "text",
+            "label": "Index Name",
+            "default": "",
+            "description": "The index to act on. Accepts ${field} placeholders. Required for every operation except LIST_INDICES.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SEARCH",
+                "INSERT",
+                "CREATE_INDEX",
+                "DELETE",
+                "DELETE_INDEX"
+              ]
+            }
+          },
+          {
+            "name": "top_k",
+            "type": "integer",
+            "label": "Result Count",
+            "default": 10,
+            "constraints": {
+              "min": 1,
+              "max": 1000
+            },
+            "description": "The most hits SEARCH returns.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SEARCH"
+              ]
+            }
+          },
+          {
+            "name": "search_fields",
+            "type": "text",
+            "label": "Search Fields",
+            "default": "",
+            "description": "Comma-separated fields query_text is matched against. Blank searches every field.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SEARCH"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "optional(json)",
+    "artifact_type_output": "json",
+    "script": "\"\"\"Elasticsearch -- index, search and delete documents in the organization's Elasticsearch.\n\nOne node runs one operation, chosen in the Inspector: SEARCH, INSERT,\nCREATE_INDEX, DELETE, LIST_INDICES or DELETE_INDEX. The index name may contain\n${field} placeholders, filled from the incoming request_data. The documents,\nqueries, mappings and settings an operation consumes arrive in request_data.\n\nA misconfigured node raises ValueError before Elasticsearch is touched. An\nElasticsearch failure raises from the client, and a bulk insert that rejects\nany document raises too: a document that was not indexed must fail the run,\nnever be counted as inserted.\n\"\"\"\n\nimport json\nimport re\n\nimport perceivo\n\n_MAX_RESULTS = 1000\n# The fields each operation adds to response_data; the artifact carries exactly these.\n_RESULT_FIELDS = {\n    \"SEARCH\": (\"operation\", \"index_name\", \"results\", \"total\", \"index_missing\"),\n    \"INSERT\": (\"operation\", \"index_name\", \"insert_count\"),\n    \"CREATE_INDEX\": (\"operation\", \"index_name\"),\n    \"DELETE\": (\"operation\", \"index_name\", \"deleted\"),\n    \"LIST_INDICES\": (\"operation\", \"index_name\", \"indices\"),\n    \"DELETE_INDEX\": (\"operation\", \"index_name\"),\n}\n_PLACEHOLDER = re.compile(r\"\\$\\{([\\w.]+)\\}\")\n\n\ndef _lookup(data, path: str):\n    \"\"\"Return (True, value) for a dotted path into data, or (False, None).\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if isinstance(value, dict) and part in value:\n            value = value[part]\n        elif isinstance(value, list) and part.isdigit() and int(part) < len(value):\n            value = value[int(part)]\n        else:\n            return False, None\n    return True, value\n\n\ndef _fill(label: str, template: str, data: dict) -> str:\n    \"\"\"Replace each ${path} in template with that value from data, raising on a missing field.\"\"\"\n\n    def _replace(match):\n        found, value = _lookup(data, match.group(1))\n        if not found:\n            raise ValueError(\n                f\"{label} refers to ${{{match.group(1)}}}, but the incoming data has no such field.\"\n            )\n        return value if isinstance(value, str) else json.dumps(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    value = perceivo.params.get(name, default)\n    return default if value is None else str(value)\n\n\ndef _result_count() -> int:\n    raw = perceivo.params.get(\"top_k\", 10)\n    try:\n        count = int(raw)\n    except (TypeError, ValueError):\n        raise ValueError(f\"Result Count is {raw!r}. Use a whole number from 1 to {_MAX_RESULTS}.\") from None\n    if not 1 <= count <= _MAX_RESULTS:\n        raise ValueError(f\"Result Count is {count}. Use a whole number from 1 to {_MAX_RESULTS}.\")\n    return count\n\n\ndef _optional_object(data: dict, name: str):\n    \"\"\"request_data[name] when it is an object, None when absent; anything else raises.\"\"\"\n    value = data.get(name)\n    if value is None:\n        return None\n    if not isinstance(value, dict):\n        raise ValueError(f\"request_data.{name} must be an object, not {type(value).__name__}.\")\n    return value\n\n\ndef _build_query(data: dict, search_fields: str) -> dict:\n    \"\"\"The query DSL: an explicit query_dsl wins; else query_text over Search Fields; else match_all.\"\"\"\n    explicit = _optional_object(data, \"query_dsl\")\n    if explicit:\n        return explicit\n    text = data.get(\"query_text\")\n    if text is None or str(text).strip() == \"\":\n        return {\"match_all\": {}}\n    query = {\"query\": str(text)}\n    fields = [f.strip() for f in search_fields.split(\",\") if f.strip()]\n    if fields:\n        query[\"fields\"] = fields\n    return {\"multi_match\": query}\n\n\ndef _documents(data: dict) -> tuple:\n    \"\"\"Validate INSERT's documents and doc_ids; return (documents, doc_ids or None).\"\"\"\n    documents = data.get(\"documents\")\n    if not isinstance(documents, list) or not documents:\n        raise ValueError(\"INSERT needs a non-empty documents array in request_data.\")\n    if not all(isinstance(doc, dict) for doc in documents):\n        raise ValueError(\"INSERT needs every item of documents to be an object.\")\n    doc_ids = data.get(\"doc_ids\")\n    if doc_ids is None:\n        return documents, None\n    if not isinstance(doc_ids, list) or len(doc_ids) != len(documents):\n        raise ValueError(\n            f\"doc_ids must be an array with one id per document ({len(documents)}), \"\n            \"or be left out so Elasticsearch assigns ids.\"\n        )\n    return documents, [str(doc_id) for doc_id in doc_ids]\n\n\ndef _hits(response) -> tuple:\n    \"\"\"Return (results, total) from a search response, each hit flattened to id, score and source.\"\"\"\n    block = response.get(\"hits\") or {}\n    results = [\n        {\"id\": hit.get(\"_id\"), \"score\": hit.get(\"_score\"), **(hit.get(\"_source\") or {})}\n        for hit in block.get(\"hits\") or []\n    ]\n    total = block.get(\"total\") or 0\n    if isinstance(total, dict):\n        total = total.get(\"value\") or 0\n    return results, int(total)\n\n\n@perceivo.agent\nasync def elasticsearch_agent(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Run one Elasticsearch operation.\n\n    The JSON artifact carries the operation's result. response_data carries the\n    same fields on top of the incoming request_data, less the bulky inputs this\n    node consumed (documents, doc_ids, query_text, query_dsl, mappings,\n    settings), so downstream nodes keep their context.\n    \"\"\"\n    data = input.request_data or {}\n    if not isinstance(data, dict):\n        raise ValueError(f\"request_data must be an object, not {type(data).__name__}.\")\n\n    operation = _param(\"operation\", \"SEARCH\").strip().upper()\n    if operation not in _RESULT_FIELDS:\n        raise ValueError(f\"Operation is {operation!r}. Choose one of: {', '.join(_RESULT_FIELDS)}.\")\n\n    index_name = _fill(\"Index Name\", _param(\"index_name\"), data).strip()\n    if not index_name and operation != \"LIST_INDICES\":\n        raise ValueError(f\"Index Name is empty. {operation} needs the index to act on.\")\n\n    # Everything an operation needs is checked here, before the connection.\n    if operation == \"SEARCH\":\n        query = _build_query(data, _param(\"search_fields\"))\n        size = _result_count()\n    elif operation == \"INSERT\":\n        documents, doc_ids = _documents(data)\n    elif operation == \"CREATE_INDEX\":\n        mappings = _optional_object(data, \"mappings\")\n        settings = _optional_object(data, \"settings\")\n    elif operation == \"DELETE\":\n        doc_id = data.get(\"doc_id\")\n        query = _optional_object(data, \"query_dsl\")\n        if doc_id in (None, \"\") and not query:\n            raise ValueError(\"DELETE needs a doc_id or a query_dsl object in request_data.\")\n\n    # Forward the incoming data, less the bulky payloads this node consumes.\n    passthrough = dict(data)\n    for consumed in (\"documents\", \"doc_ids\", \"query_text\", \"query_dsl\", \"mappings\", \"settings\"):\n        passthrough.pop(consumed, None)\n\n    es = await perceivo.cluster.elasticsearch.connect()\n    perceivo.log.info(f\"Elasticsearch: {operation}\", operation=operation, index_name=index_name)\n\n    if operation == \"SEARCH\":\n        response = await es.search(index=index_name, query=query, size=size)\n        results, total = _hits(response)\n        result = {\n            **passthrough,\n            \"operation\": operation,\n            \"index_name\": index_name,\n            \"results\": results,\n            \"total\": total,\n            \"index_missing\": bool(response.get(\"_perceivo_index_missing\")),\n        }\n    elif operation == \"INSERT\":\n        report = await es.bulk_index(index=index_name, documents=documents, doc_ids=doc_ids)\n        failed = int(report.get(\"error_count\") or 0)\n        if failed:\n            raise RuntimeError(\n                f\"Elasticsearch rejected {failed} of {len(documents)} documents for index \"\n                f\"{index_name!r}: {report.get('errors')}\"\n            )\n        result = {\n            **passthrough,\n            \"operation\": operation,\n            \"index_name\": index_name,\n            \"insert_count\": int(report.get(\"success_count\") or 0),\n        }\n    elif operation == \"CREATE_INDEX\":\n        await es.create_index(name=index_name, mappings=mappings, settings=settings)\n        result = {**passthrough, \"operation\": operation, \"index_name\": index_name}\n    elif operation == \"DELETE\":\n        if doc_id not in (None, \"\"):\n            deleted = 1 if await es.delete_document(index=index_name, doc_id=str(doc_id)) else 0\n        else:\n            deleted = int(await es.delete_by_query(index=index_name, query=query))\n        result = {**passthrough, \"operation\": operation, \"index_name\": index_name, \"deleted\": deleted}\n    elif operation == \"LIST_INDICES\":\n        indices = sorted(await es.list_indices())\n        result = {**passthrough, \"operation\": operation, \"index_name\": index_name, \"indices\": indices}\n    else:\n        await es.delete_index(index_name)\n        result = {**passthrough, \"operation\": operation, \"index_name\": index_name}\n\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data={field: result[field] for field in _RESULT_FIELDS[operation]},\n            mime_type=\"application/json\",\n        ),\n        response_data=result,\n    )\n",
+    "manifest_yaml": "extension_type: agent\nname: Elasticsearch\ndescription: >\n  Runs one operation against the organization's Elasticsearch - search, bulk\n  insert, create an index, delete documents, list indices or delete an index.\n  The index name accepts ${field} placeholders from request_data. A\n  misconfigured node, an Elasticsearch error or a rejected document raises and\n  fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The script never reads input.artifact; it always builds its own JSON\n    # result. optional(json) - \"a json, or nothing\" - keeps it chainable after\n    # any artifact-producing node.\n    artifact_type_input: optional(json)\n    request_data:\n      documents: array (optional) - Objects to index. Required by INSERT.\n      doc_ids: array (optional) - One id per document, for INSERT. Left out, Elasticsearch assigns ids.\n      doc_id: string (optional) - The document to delete, for DELETE.\n      query_text: string (optional) - Free text matched against Search Fields, for SEARCH.\n      query_dsl: object (optional) - An Elasticsearch query. Wins over query_text in SEARCH; selects the documents DELETE removes.\n      mappings: object (optional) - Field mappings, for CREATE_INDEX.\n      settings: object (optional) - Index settings, for CREATE_INDEX.\n    artifact_type_output: json\n    # response_data is the incoming request_data, less the payloads this node\n    # consumed, with the operation's result on top.\n    response_data_passthrough: request_data\n    response_data_passthrough_except: [documents, doc_ids, query_text, query_dsl, mappings, settings]\n    response_data:\n      operation: string - The operation that ran.\n      index_name: string - The index acted on; empty for LIST_INDICES.\n      results: array (optional) - SEARCH only - matching documents, each with id, score and its fields.\n      total: integer (optional) - SEARCH only - total matches Elasticsearch reported.\n      index_missing: boolean (optional) - SEARCH only - true when the index does not exist, so no results.\n      insert_count: integer (optional) - INSERT only - number of documents indexed.\n      deleted: integer (optional) - DELETE only - number of documents removed.\n      indices: array (optional) - LIST_INDICES only - index names, sorted.\n\ninput_parameters:\n  - name: operation\n    type: select\n    label: Operation\n    options: [SEARCH, INSERT, CREATE_INDEX, DELETE, LIST_INDICES, DELETE_INDEX]\n    default: SEARCH\n    required: true\n    description: The Elasticsearch operation this node runs.\n  - name: index_name\n    type: text\n    label: Index Name\n    default: \"\"\n    description: The index to act on. Accepts ${field} placeholders. Required for every operation except LIST_INDICES.\n    depends_on:\n      parameter: operation\n      visible_when: [SEARCH, INSERT, CREATE_INDEX, DELETE, DELETE_INDEX]\n  - name: top_k\n    type: integer\n    label: Result Count\n    default: 10\n    constraints:\n      min: 1\n      max: 1000\n    description: The most hits SEARCH returns.\n    depends_on:\n      parameter: operation\n      visible_when: [SEARCH]\n  - name: search_fields\n    type: text\n    label: Search Fields\n    default: \"\"\n    description: Comma-separated fields query_text is matched against. Blank searches every field.\n    depends_on:\n      parameter: operation\n      visible_when: [SEARCH]\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "documents": {
+            "type": "array",
+            "required": false,
+            "description": "Objects to index. Required by INSERT."
+          },
+          "doc_ids": {
+            "type": "array",
+            "required": false,
+            "description": "One id per document, for INSERT. Left out, Elasticsearch assigns ids."
+          },
+          "doc_id": {
+            "type": "string",
+            "required": false,
+            "description": "The document to delete, for DELETE."
+          },
+          "query_text": {
+            "type": "string",
+            "required": false,
+            "description": "Free text matched against Search Fields, for SEARCH."
+          },
+          "query_dsl": {
+            "type": "object",
+            "required": false,
+            "description": "An Elasticsearch query. Wins over query_text in SEARCH; selects the documents DELETE removes."
+          },
+          "mappings": {
+            "type": "object",
+            "required": false,
+            "description": "Field mappings, for CREATE_INDEX."
+          },
+          "settings": {
+            "type": "object",
+            "required": false,
+            "description": "Index settings, for CREATE_INDEX."
+          }
+        },
+        "response_data_schema": {
+          "operation": {
+            "type": "string",
+            "required": true,
+            "description": "The operation that ran."
+          },
+          "index_name": {
+            "type": "string",
+            "required": true,
+            "description": "The index acted on; empty for LIST_INDICES."
+          },
+          "results": {
+            "type": "array",
+            "required": false,
+            "description": "SEARCH only - matching documents, each with id, score and its fields."
+          },
+          "total": {
+            "type": "integer",
+            "required": false,
+            "description": "SEARCH only - total matches Elasticsearch reported."
+          },
+          "index_missing": {
+            "type": "boolean",
+            "required": false,
+            "description": "SEARCH only - true when the index does not exist, so no results."
+          },
+          "insert_count": {
+            "type": "integer",
+            "required": false,
+            "description": "INSERT only - number of documents indexed."
+          },
+          "deleted": {
+            "type": "integer",
+            "required": false,
+            "description": "DELETE only - number of documents removed."
+          },
+          "indices": {
+            "type": "array",
+            "required": false,
+            "description": "LIST_INDICES only - index names, sorted."
+          }
+        },
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "json",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ]
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

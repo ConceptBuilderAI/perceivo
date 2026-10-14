@@ -1,0 +1,969 @@
+{
+  "components": {
+    "comp_0": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "0a2205a1-2d3d-4f2b-8a72-4b48981a5d24",
+      "category": "FSM",
+      "config": {
+        "detected_endpoints": [],
+        "fsm": {
+          "max_steps": 1
+        },
+        "icon": {
+          "type": "lucide",
+          "value": "shield-alert"
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "constraints": {
+                "max": 10,
+                "min": 0
+              },
+              "default": 3,
+              "description": "Number of retry attempts after the initial failure. 0 means no retries.",
+              "label": "Max Retries",
+              "name": "max_retries",
+              "required": true,
+              "type": "integer"
+            },
+            {
+              "constraints": {
+                "max": 60,
+                "min": 0,
+                "step": 0.5
+              },
+              "default": 1,
+              "description": "Base delay between retries in seconds.",
+              "label": "Retry Delay (seconds)",
+              "name": "retry_delay_seconds",
+              "type": "number"
+            },
+            {
+              "default": "none",
+              "description": "none: constant delay. linear: delay * attempt. exponential: delay * 2^attempt.",
+              "label": "Retry Backoff",
+              "name": "retry_backoff",
+              "options": [
+                "none",
+                "linear",
+                "exponential"
+              ],
+              "type": "select"
+            },
+            {
+              "default": "fail",
+              "description": "fail: raise the error. fallback: invoke the fallback state port. skip: pass original data through with error metadata.",
+              "label": "On Retries Exhausted",
+              "name": "on_exhausted",
+              "options": [
+                "fail",
+                "fallback",
+                "skip"
+              ],
+              "type": "select"
+            }
+          ],
+          "values": {
+            "max_retries": 3,
+            "on_exhausted": "fallback",
+            "retry_backoff": "none",
+            "retry_delay_seconds": 1
+          }
+        },
+        "is_error_handler": true,
+        "port_order": [
+          "input",
+          "primary",
+          "fallback",
+          "policy"
+        ],
+        "port_sides": {
+          "fallback": "bottom",
+          "input": "left",
+          "primary": "bottom"
+        }
+      },
+      "description": "What it does The engine of the Error Handler template. It runs the primary step, retries it on failure, and falls back when the retries run out.\n\nHow it works Runs the primary slot. On failure it waits and retries, up to the configured limit, and can lengthen the wait after each attempt so a struggling service is not hammered. When attempts are exhausted its policy decides between running the fallback slot and failing the run.\n\nConfigure\n- Max retries - further attempts after the first failure.\n- Retry delay seconds - the wait between attempts.\n- Retry backoff - lengthen the wait after each failure rather than keeping it fixed.\n- On exhausted - run the fallback, or fail the run.\n\nIn and out In: the data the primary step needs. Out: the primary's result, or the fallback's.\n\nUse it when It comes with the Error Handler template - configure it there rather than adding it on its own.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: fsm\nname: Error Handler\ndescription: >\n  FSM layer that wraps a primary state slot with configurable retry logic. When\n  the retries are exhausted it consults its paired policy and then routes to the\n  fallback slot, skips, or reports the failure.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: optional(json)\n    artifact_type_output: optional(json)\n    response_data:\n      status: string - One of success, recovered, skipped, or failed.\n      attempts: integer - How many times the primary slot was invoked.\n      primary_failed: boolean - True when the primary slot raised at least once.\n      policy_consulted: boolean - False when the policy slot could not be reached\n        and on_exhausted was used as the decision instead.\n      source: string (optional) - Which slot produced the result; absent when skipped.\n      result: object (optional) - The primary slot's response_data; success only.\n      primary_error: string (optional) - Last error from the primary slot.\n      fallback_result: object (optional) - The fallback slot's response_data.\n      fallback_error: string (optional) - Error raised by the fallback slot itself.\n\nstate_ports:\n  - port_name: primary\n    artifact_type_input: none\n    artifact_type_output: none\n  - port_name: fallback\n    artifact_type_input: optional(json)\n    artifact_type_output: none\n\npolicy_ports:\n  - port_name: policy\n    artifact_type_input: none\n    artifact_type_output: none\n    response_data:\n      action: string - The decision to execute, one of fail, fallback, or skip.\n      error: string (optional) - The error the decision was made about.\n      attempts: integer (optional) - Attempts made before the decision.\n\ninput_parameters:\n  - name: max_retries\n    type: integer\n    label: Max Retries\n    default: 3\n    description: Number of attempts against the primary slot. 0 means no retries.\n  - name: retry_delay_seconds\n    type: number\n    label: Retry Delay (seconds)\n    default: 1\n    description: Base delay between retries in seconds.\n  - name: retry_backoff\n    type: select\n    label: Retry Backoff\n    options: [none, linear, exponential]\n    default: none\n    description: none, constant delay. Otherwise the delay grows per attempt.\n  - name: on_exhausted\n    type: select\n    label: On Retries Exhausted\n    options: [fail, fallback, skip]\n    default: fail\n    description: What to do once every primary attempt has failed.\n",
+      "name": "ERROR HANDLER - FSM (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "optional(json)",
+          "artifact_type_output": "optional(json)",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "attempts": {
+              "required": true,
+              "type": "integer"
+            },
+            "fallback_error": {
+              "required": false,
+              "type": "string"
+            },
+            "fallback_result": {
+              "required": false,
+              "type": "object"
+            },
+            "policy_consulted": {
+              "required": false,
+              "type": "boolean"
+            },
+            "primary_error": {
+              "required": false,
+              "type": "string"
+            },
+            "primary_failed": {
+              "required": false,
+              "type": "boolean"
+            },
+            "result": {
+              "required": false,
+              "type": "object"
+            },
+            "source": {
+              "required": false,
+              "type": "string"
+            },
+            "status": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "optional(json)",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "fallback",
+          "label": "Fallback",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "policy",
+          "label": "Policy",
+          "multi_artifact": false,
+          "port_type": "policy",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "action": {
+              "required": true,
+              "type": "string"
+            },
+            "attempts": {
+              "required": false,
+              "type": "integer"
+            },
+            "error": {
+              "required": false,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "primary",
+          "label": "Primary",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\nimport asyncio\n\n# --- Unwired-port detection -------------------------------------------------\n#\n# The engine raises a BARE ValueError when an invoke port has no outgoing edge\n# (\"No connection found for port {port} on node {node}\"), so the exception TYPE\n# cannot separate a wiring fault from a failure the target component raised.\n# The message is the only discriminator the runtime offers, and the separation\n# is load-bearing: caught as an ordinary failure, an unwired \"primary\" makes\n# this handler retry a port that can never fire, consult its policy, take the\n# fallback, and report status=\"recovered\" -- green over a graph in which the\n# primary path never executed at all. A missing edge is a CONFIGURATION error,\n# not something to recover from, so it is raised instead of reported.\n_UNWIRED = \"No connection found for port\"\n\n\ndef _unwired_port(port_name: str, exc: BaseException) -> bool:\n    \"\"\"True when exc is the engine saying port_name has no connection.\"\"\"\n    message = str(exc)\n    return _UNWIRED in message and f\"port {port_name} on node\" in message\n\n\ndef _misconfigured(port_name: str, exc: BaseException) -> RuntimeError:\n    \"\"\"The error to raise instead of recovering from an unwired port_name.\"\"\"\n    return RuntimeError(\n        f\"Error Handler is misconfigured: its {port_name!r} port has no outgoing \"\n        f\"connection, so the {port_name} path cannot execute. Connect a component \"\n        f\"to the {port_name!r} port. Engine reported: {exc}\"\n    )\n\n\n@perceivo.fsm\nasync def error_handler(input: perceivo.primitives.FsmInput) -> perceivo.primitives.FsmOutput:\n    \"\"\"Error Handler FSM: retry primary, consult policy on exhaustion, then fall back.\"\"\"\n    max_retries = int(perceivo.params.get(\"max_retries\", 3))\n    retry_delay_seconds = float(perceivo.params.get(\"retry_delay_seconds\", 2.0))\n\n    # retry_backoff may be \"none\" (no backoff) or a float multiplier\n    raw_backoff = perceivo.params.get(\"retry_backoff\", \"1.0\")\n    retry_backoff = 1.0 if raw_backoff in (\"none\", \"None\", \"\") else float(raw_backoff)\n\n    on_exhausted = perceivo.params.get(\"on_exhausted\", \"fallback\")\n\n    data = input.request_data or {}\n    last_error = None\n\n    # --- Retry loop: invoke primary up to max_retries times ---\n    for attempt in range(1, max_retries + 1):\n        perceivo.log.info(f\"Error Handler: attempt {attempt}/{max_retries}\")\n        try:\n            result = await perceivo.flow.invoke(\"primary\", data)\n            perceivo.log.info(f\"Error Handler: primary succeeded on attempt {attempt}\")\n            return perceivo.primitives.FsmOutput(\n                artifact=input.artifact,\n                response_data={\n                    \"status\": \"success\",\n                    \"source\": \"primary\",\n                    \"attempts\": attempt,\n                    \"primary_failed\": False,\n                    \"policy_consulted\": False,\n                    \"result\": result.get(\"response_data\", {})\n                }\n            )\n        except Exception as e:\n            # An unwired primary is not a failed attempt. Retrying it and then\n            # recovering from it is how a never-executed graph came to report\n            # itself as \"recovered\".\n            if _unwired_port(\"primary\", e):\n                perceivo.log.error(\n                    \"Error Handler: the primary port has no connection. That is a \"\n                    \"wiring error, not a runtime failure -- not retrying, not falling back.\"\n                )\n                raise _misconfigured(\"primary\", e) from e\n            last_error = str(e)\n            perceivo.log.warning(f\"Error Handler: attempt {attempt} failed: {last_error}\")\n            if attempt < max_retries:\n                delay = retry_delay_seconds * (retry_backoff ** (attempt - 1))\n                perceivo.log.info(f\"Error Handler: waiting {delay:.1f}s before retry\")\n                await asyncio.sleep(delay)\n\n    # --- All retries exhausted: consult policy ---\n    perceivo.log.warning(f\"Error Handler: all {max_retries} retries exhausted. Consulting policy.\")\n    policy_input = {\n        \"error\": last_error,\n        \"attempts\": max_retries,\n        \"on_exhausted\": on_exhausted\n    }\n    policy_consulted = True\n    try:\n        policy_result = await perceivo.flow.invoke(\"policy\", policy_input)\n        policy_data = policy_result.get(\"response_data\", {})\n        next_action = policy_data.get(\"action\", on_exhausted)\n        perceivo.log.info(f\"Error Handler: policy decision = {next_action}\")\n    except Exception as pe:\n        # Defaulting is kept -- the policy slot is advisory and on_exhausted is a\n        # real default -- but the payload now records that the decision was\n        # DEFAULTED, so a reader cannot mistake an unconsulted policy for a\n        # consulted one.\n        policy_consulted = False\n        perceivo.log.error(f\"Error Handler: policy invocation failed, defaulting to \"\n                           f\"on_exhausted={on_exhausted}: {pe}\")\n        next_action = on_exhausted\n\n    # --- Execute policy decision ---\n    if next_action == \"fallback\":\n        perceivo.log.info(\"Error Handler: executing fallback path\")\n        try:\n            fallback_result = await perceivo.flow.invoke(\"fallback\", data)\n            perceivo.log.info(\"Error Handler: fallback succeeded\")\n            return perceivo.primitives.FsmOutput(\n                artifact=input.artifact,\n                response_data={\n                    \"status\": \"recovered\",\n                    \"source\": \"fallback\",\n                    \"attempts\": max_retries,\n                    \"primary_failed\": True,\n                    \"policy_consulted\": policy_consulted,\n                    \"primary_error\": last_error,\n                    \"fallback_result\": fallback_result.get(\"response_data\", {})\n                }\n            )\n        except Exception as fe:\n            # Same distinction on the recovery side: \"the fallback component\n            # raised\" and \"no fallback component was ever connected\" are\n            # different defects and must not share one payload.\n            if _unwired_port(\"fallback\", fe):\n                perceivo.log.error(\n                    \"Error Handler: policy chose fallback but the fallback port \"\n                    \"has no connection.\"\n                )\n                raise _misconfigured(\"fallback\", fe) from fe\n            perceivo.log.error(f\"Error Handler: fallback also failed: {fe}\")\n            return perceivo.primitives.FsmOutput(\n                artifact=input.artifact,\n                response_data={\n                    \"status\": \"failed\",\n                    \"source\": \"fallback_failed\",\n                    \"attempts\": max_retries,\n                    \"primary_failed\": True,\n                    \"policy_consulted\": policy_consulted,\n                    \"primary_error\": last_error,\n                    \"fallback_error\": str(fe)\n                }\n            )\n    elif next_action == \"skip\":\n        perceivo.log.info(\"Error Handler: skipping (policy said skip)\")\n        return perceivo.primitives.FsmOutput(\n            artifact=input.artifact,\n            response_data={\n                \"status\": \"skipped\",\n                \"source\": \"policy_skip\",\n                \"attempts\": max_retries,\n                \"primary_failed\": True,\n                \"policy_consulted\": policy_consulted,\n                \"primary_error\": last_error\n            }\n        )\n    else:\n        perceivo.log.error(f\"Error Handler: failing (policy said fail). Error: {last_error}\")\n        return perceivo.primitives.FsmOutput(\n            artifact=input.artifact,\n            response_data={\n                \"status\": \"failed\",\n                \"source\": \"primary_exhausted\",\n                \"attempts\": max_retries,\n                \"primary_failed\": True,\n                \"policy_consulted\": policy_consulted,\n                \"primary_error\": last_error\n            }\n        )\n",
+      "short_description": "The engine of the Error Handler template. It runs the primary step, retries it on failure,",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_1": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "8b05895f-9d61-4969-82c3-141318738a03",
+      "category": "POLICY",
+      "config": {
+        "detected_endpoints": [],
+        "is_agent_tool_internal": true
+      },
+      "description": "What it does The decision rule for the Error Handler: after a failure it decides whether to retry, fall back, or give up.\n\nHow it works Counts the attempts made, compares them against the retry limit, applies the backoff, and returns the next state. Once attempts are exhausted it follows the on-exhausted setting. It makes no calls of its own and holds no configuration.\n\nConfigure Nothing. Set the retry limit, delay, backoff and exhausted behaviour on the FSM instead.\n\nIn and out In: the failure, the attempt count and the retry settings. Out: the next state - retry, fall back, or fail.\n\nUse it when It comes with the Error Handler template. You do not add or configure it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: policy\nname: Error Handler Policy\ndescription: >\n  Internal control policy for the Error Handler FSM. Decides what happens once\n  every attempt against the primary state slot has failed.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    request_data:\n      on_exhausted: string (optional) - Requested action, one of fail, fallback, or skip.\n      error: string (optional) - The last error from the primary slot.\n      attempts: integer (optional) - How many attempts were made.\n    response_data:\n      action: string - The decision, echoed as the FSM's next state.\n      error: string - The error the decision was made about.\n      attempts: integer - Attempts made before the decision.\n\npolicy_states:\n  - primary\n  - fallback\n",
+      "name": "ERROR HANDLER - POLICY (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "attempts": {
+              "required": false,
+              "type": "integer"
+            },
+            "error": {
+              "required": false,
+              "type": "string"
+            },
+            "on_exhausted": {
+              "required": false,
+              "type": "string"
+            }
+          },
+          "response_data_schema": {
+            "action": {
+              "required": true,
+              "type": "string"
+            },
+            "attempts": {
+              "required": true,
+              "type": "integer"
+            },
+            "error": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.policy\nasync def error_handler_policy_internal(input: perceivo.primitives.PolicyInput) -> perceivo.primitives.PolicyOutput:\n    rd = input.request_data or {}\n    on_exhausted = rd.get(\"on_exhausted\", \"fail\")\n    error = rd.get(\"error\", \"Unknown error\")\n    attempts = rd.get(\"attempts\", 0)\n\n    perceivo.log.info(\n        f\"Error Handler Policy: action={on_exhausted} after {attempts} attempts\",\n        error=error,\n    )\n\n    return perceivo.primitives.PolicyOutput(\n        next_state=on_exhausted,\n        response_data={\n            \"action\": on_exhausted,\n            \"error\": error,\n            \"attempts\": attempts,\n        },\n    )\n",
+      "short_description": "The decision rule for the Error Handler: after a failure it decides whether to retry, fall",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_2": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "b516a4f7-e9a3-4638-a29f-061cb1d16be9",
+      "category": "START",
+      "config": {
+        "detected_endpoints": [],
+        "input_parameters": {
+          "declarations": [
+            {
+              "_schema_type": "string",
+              "label": "prompt",
+              "name": "prompt",
+              "required": true,
+              "type": "text"
+            }
+          ],
+          "values": {}
+        },
+        "is_generic_start": true,
+        "port_order": [
+          "external_input",
+          "output"
+        ]
+      },
+      "description": "What it does The entry point of the Error Handler template. It accepts the input the protected step needs.\n\nHow it works Passes the incoming data and any accompanying file straight through to the handler, which gives it to the primary slot and, if needed, the fallback.\n\nConfigure Nothing.\n\nIn and out In: the caller's request. Out: the same, unchanged, into the handler.\n\nUse it when It comes with the Error Handler template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+      "name": "ERROR HANDLER - START (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "external_input",
+          "label": "External Input",
+          "multi_artifact": false,
+          "port_type": "external_in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "output",
+          "label": "Output",
+          "multi_artifact": false,
+          "port_type": "out",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.start\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    return perceivo.primitives.StartOutput(\n        artifact=input.artifact,\n        response_data=input.request_data or {},\n    )\n",
+      "short_description": "The entry point of the Error Handler template. It accepts the input the protected step needs.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_3": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "d8e0175f-ffc0-4087-8a97-71dad9ddc5c9",
+      "category": "END",
+      "config": {
+        "detected_endpoints": [],
+        "is_generic_end": true,
+        "output_parameters": {
+          "declarations": [],
+          "values": {}
+        },
+        "port_order": [
+          "input",
+          "external_output"
+        ]
+      },
+      "description": "What it does The exit of the Error Handler template. It returns whichever path succeeded.\n\nHow it works Takes the data reaching it - from the primary step or from the fallback - and returns it as the result of the nested run, so the parent flow continues either way. It adds nothing of its own.\n\nConfigure Nothing.\n\nIn and out In: the result of the primary or fallback step. Out: the same data, as the template's result.\n\nUse it when It comes with the Error Handler template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: json\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: json\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\n",
+      "name": "ERROR HANDLER - END (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "external_output",
+          "label": "External Output",
+          "multi_artifact": false,
+          "port_type": "external_out",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.end\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data=input.response_data or {},\n    )\n",
+      "short_description": "The exit of the Error Handler template. It returns whichever path succeeded.",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_4": {
+      "additional_packages": null,
+      "artifact_type_input": "none",
+      "artifact_type_output": "none",
+      "asset_id": null,
+      "category": "TOOL",
+      "config": {
+        "detected_endpoints": [],
+        "icon": {
+          "type": "lucide",
+          "value": "zap-off"
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "default": "always",
+              "description": "always: raise on every invocation. never: succeed and return primary_ran and primary_failed.",
+              "label": "Fail Mode",
+              "name": "fail_mode",
+              "options": [
+                "always",
+                "never"
+              ],
+              "type": "select"
+            },
+            {
+              "default": "RuntimeError",
+              "depends_on": {
+                "parameter": "fail_mode",
+                "visible_when": [
+                  "always"
+                ]
+              },
+              "description": "Which exception class to raise when Fail Mode is always.",
+              "label": "Error Type",
+              "name": "error_type",
+              "options": [
+                "RuntimeError",
+                "ValueError",
+                "ConnectionError",
+                "TimeoutError"
+              ],
+              "type": "select"
+            },
+            {
+              "default": "",
+              "depends_on": {
+                "parameter": "fail_mode",
+                "visible_when": [
+                  "always"
+                ]
+              },
+              "description": "The message carried by the raised exception.",
+              "label": "Error Message",
+              "name": "error_message",
+              "type": "text"
+            }
+          ],
+          "values": {
+            "error_message": "",
+            "error_type": "RuntimeError",
+            "fail_mode": "always"
+          }
+        },
+        "port_order": [
+          "input"
+        ],
+        "port_sides": {
+          "input": "top"
+        }
+      },
+      "description": "What it does The primary slot of the Error Handler: the step that is allowed to fail.\n\nHow it works It ships failing on purpose, so a freshly created Error Handler runs its whole path the first time you press run - the failure, the retries, the policy decision and the recovery. Replace it with the work you actually want protected. If you would rather keep it as a probe, set Fail Mode to never and it succeeds instead, returning primary_ran and primary_failed.\n\nConfigure\n- Fail Mode - raise on every call, or succeed and return primary_ran and primary_failed.\n- Error Type - which exception class to raise.\n- Error Message - the text carried by that exception.\n\nIn and out In: whatever the Error Handler was given. Out: primary_ran and primary_failed when Fail Mode is never; nothing when it raises.\n\nUse it when It comes with the Error Handler template. Swap it out for the real work rather than adding it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: tool\nname: Error Handler Primary\ndescription: >\n  The primary slot of the Error Handler template: the step that is allowed to\n  fail. It ships failing on purpose so the template runs its retry, policy and\n  fallback path end to end out of the box. Replace it with the real work, or set\n  fail_mode to never to make it succeed, returning primary_ran and primary_failed.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # \"none\" on both sides so the INVOKE edge from the FSM's primary STATE port\n    # validates; the slot exchanges request_data, never an artifact.\n    artifact_type_input: none\n    artifact_type_output: none\n    response_data:\n      primary_ran: boolean - Always true when the slot returned rather than raised.\n      primary_failed: boolean - Always false here; the failing path raises instead.\n\ninput_parameters:\n  - name: fail_mode\n    type: select\n    label: Fail Mode\n    options: [always, never]\n    default: always\n    description: always, raise on every invocation. never, succeed and return primary_ran and primary_failed.\n  - name: error_type\n    type: select\n    label: Error Type\n    options: [RuntimeError, ValueError, ConnectionError, TimeoutError]\n    default: RuntimeError\n    description: Which exception class to raise when fail_mode is always.\n    depends_on:\n      parameter: fail_mode\n      visible_when: [always]\n  - name: error_message\n    type: text\n    label: Error Message\n    description: The message carried by the raised exception.\n    depends_on:\n      parameter: fail_mode\n      visible_when: [always]\n",
+      "name": "ERROR HANDLER - PRIMARY (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "primary_failed": {
+              "description": "Always false here; the failing path raises instead.",
+              "required": false,
+              "type": "boolean"
+            },
+            "primary_ran": {
+              "description": "Always true when the slot returned rather than raised.",
+              "required": false,
+              "type": "boolean"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n# The Error Handler template ships with this component in its primary slot so the\n# template is a RUNNING demonstration rather than a skeleton: out of the box the\n# primary fails, the FSM retries it, the policy is consulted, and the fallback\n# recovers. Replace this component with the real work; or, to keep it as a probe\n# and stop it failing, set fail_mode to \"never\".\n_ERROR_CLASSES = {\n    \"RuntimeError\": RuntimeError,\n    \"ValueError\": ValueError,\n    \"ConnectionError\": ConnectionError,\n    \"TimeoutError\": TimeoutError,\n}\n\n_DEFAULT_MESSAGE = (\n    \"Error Handler primary placeholder: this slot fails on purpose so the \"\n    \"template demonstrates its retry and fallback path. Replace it with the \"\n    \"real work.\"\n)\n\n\n@perceivo.tool\nasync def error_handler_primary(input: perceivo.primitives.ToolInput) -> perceivo.primitives.ToolOutput:\n    \"\"\"The Error Handler's primary slot: the work that is allowed to fail.\n\n    Raises by default so the surrounding template exercises retry, policy and\n    fallback end to end. With fail_mode set to \"never\" it succeeds and returns\n    primary_ran and primary_failed, which is what the template looks like once\n    the real work is wired in.\n    \"\"\"\n    fail_mode = str(perceivo.params.get(\"fail_mode\", \"always\") or \"always\").strip().lower()\n\n    request_data = input.request_data or {}\n    if not isinstance(request_data, dict):\n        request_data = {\"data\": request_data}\n\n    if fail_mode == \"never\":\n        perceivo.log.info(\"Error Handler Primary: fail_mode=never, succeeding.\")\n        return perceivo.primitives.ToolOutput(\n            response_data={\n                \"primary_ran\": True,\n                \"primary_failed\": False,\n            }\n        )\n\n    message = str(perceivo.params.get(\"error_message\", _DEFAULT_MESSAGE) or _DEFAULT_MESSAGE)\n    error_type = str(perceivo.params.get(\"error_type\", \"RuntimeError\") or \"RuntimeError\")\n    perceivo.log.warning(f\"Error Handler Primary: raising {error_type}: {message}\")\n    raise _ERROR_CLASSES.get(error_type, RuntimeError)(message)\n    # UNREACHABLE, AND DELIBERATELY KEPT. VAL-RETURN-001 requires a decorated\n    # tool to statically return its declared Output type even when every path\n    # through the body raises; without this line the component fails validation\n    # and never reaches the graph at all.\n    return perceivo.primitives.ToolOutput(response_data={})  # NOSONAR\n",
+      "short_description": "The primary slot of the Error Handler: the step that is allowed to fail. Ships failing on purpose so the template demonstrates its recovery path.",
+      "tags": [
+        "template",
+        "control-flow",
+        "error-handling"
+      ],
+      "template_source_id": null
+    },
+    "comp_5": {
+      "additional_packages": null,
+      "artifact_type_input": "none",
+      "artifact_type_output": "none",
+      "asset_id": null,
+      "category": "ADAPTER",
+      "config": {
+        "detected_endpoints": [],
+        "icon": {
+          "type": "lucide",
+          "value": "life-buoy"
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "default": "Recovered by the Error Handler fallback slot.",
+              "description": "Note attached to the recovered result so it is distinguishable downstream.",
+              "label": "Fallback Note",
+              "name": "fallback_note",
+              "type": "text"
+            },
+            {
+              "default": "",
+              "description": "Stand-in value to return in place of the primary slot's result.",
+              "label": "Fallback Value",
+              "name": "fallback_value",
+              "type": "text"
+            }
+          ],
+          "values": {
+            "fallback_note": "Recovered by the Error Handler fallback slot.",
+            "fallback_value": ""
+          }
+        },
+        "port_order": [
+          "input"
+        ],
+        "port_sides": {
+          "input": "top"
+        }
+      },
+      "description": "What it does The recovery slot of the Error Handler: the safe answer used when the primary step could not be made to work.\n\nHow it works It runs only after every attempt against the primary slot has failed and the policy has chosen to fall back. It forwards everything it received and adds a note marking the result as recovered, so a step downstream can tell a fallback answer from a real one instead of having to guess. Replace it with the recovery you actually want - a cached value, a cheaper provider, a default.\n\nConfigure\n- Fallback Note - the note attached to the recovered result.\n- Fallback Value - a stand-in value to return in place of the primary result.\n\nIn and out In: the data the primary slot was given. Out: the same data plus the recovery markers.\n\nUse it when It comes with the Error Handler template. Swap it out for the real recovery rather than adding it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: adapter\nname: Error Handler Fallback\ndescription: >\n  The recovery slot of the Error Handler template. Runs once every attempt\n  against the primary slot has failed and the policy has chosen to fall back.\n  Forwards everything it received and marks the result as recovered.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The script reads input.artifact only through a guard and forwards it\n    # untouched, so an artifact is welcome but never required.\n    artifact_type_input: optional(json)\n    artifact_type_output: optional(json)\n    # Everything received is forwarded unchanged (`{**request_data, ...}`) in\n    # addition to the three fields declared below.\n    response_data_passthrough: request_data\n    response_data:\n      fallback_ran: boolean - Always true once the recovery slot has run.\n      fallback_note: string - Human-readable note describing the recovery.\n      fallback_value: string - The configured stand-in value, empty by default.\n\ninput_parameters:\n  - name: fallback_note\n    type: text\n    label: Fallback Note\n    default: Recovered by the Error Handler fallback slot.\n    description: Note attached to the recovered result so it is distinguishable downstream.\n  - name: fallback_value\n    type: text\n    label: Fallback Value\n    description: Stand-in value to return in place of the primary slot's result.\n",
+      "name": "ERROR HANDLER - FALLBACK (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "optional(json)",
+          "artifact_type_output": "optional(json)",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_passthrough": "request_data",
+          "response_data_passthrough_except": null,
+          "response_data_schema": {
+            "fallback_note": {
+              "description": "Human-readable note describing the recovery.",
+              "required": true,
+              "type": "string"
+            },
+            "fallback_ran": {
+              "description": "Always true once the recovery slot has run.",
+              "required": true,
+              "type": "boolean"
+            },
+            "fallback_value": {
+              "description": "The configured stand-in value, empty by default.",
+              "required": false,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.adapter\nasync def error_handler_fallback(input: perceivo.primitives.AdapterInput) -> perceivo.primitives.AdapterOutput:\n    \"\"\"The Error Handler's recovery slot: the safe answer when the primary fails.\n\n    Forwards everything it received and marks the result as recovered, so a\n    consumer downstream can tell a fallback answer from a primary one rather\n    than having to infer it. Replace it with the real recovery work.\n    \"\"\"\n    request_data = input.request_data or {}\n    if not isinstance(request_data, dict):\n        request_data = {\"data\": request_data}\n\n    artifact_data = getattr(input.artifact, \"data\", None) if input.artifact else None\n    if isinstance(artifact_data, dict):\n        # Explicit request_data wins over artifact-carried values.\n        request_data = {**artifact_data, **request_data}\n\n    note = str(\n        perceivo.params.get(\"fallback_note\", \"Recovered by the Error Handler fallback slot.\")\n        or \"Recovered by the Error Handler fallback slot.\"\n    )\n    value = perceivo.params.get(\"fallback_value\", \"\")\n\n    perceivo.log.info(f\"Error Handler Fallback: {note}\")\n    return perceivo.primitives.AdapterOutput(\n        artifact=input.artifact,\n        response_data={\n            **request_data,\n            \"fallback_ran\": True,\n            \"fallback_note\": note,\n            \"fallback_value\": value,\n        },\n    )\n",
+      "short_description": "The recovery slot of the Error Handler: forwards what it received and marks the result as recovered.",
+      "tags": [
+        "template",
+        "control-flow",
+        "error-handling"
+      ],
+      "template_source_id": null
+    }
+  },
+  "edges": [
+    {
+      "edge_kind": "MAINFLOW",
+      "source_port_index": 0,
+      "target_port_index": 1
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 2,
+      "target_port_index": 3
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 7,
+      "target_port_index": 8
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 9,
+      "target_port_index": 10
+    }
+  ],
+  "export_type": "orchestration",
+  "export_version": "1.0",
+  "exported_at": "2026-07-18T02:12:20.496382Z",
+  "nodes": [
+    {
+      "component_asset_id": "8b05895f-9d61-4969-82c3-141318738a03",
+      "component_ref": "comp_1",
+      "config": {
+        "port_sides": {
+          "": "top"
+        }
+      },
+      "local_id": "node_0",
+      "name": "Error Handler Policy",
+      "position": {
+        "x": 326.0,
+        "y": 430.0
+      }
+    },
+    {
+      "component_asset_id": "d8e0175f-ffc0-4087-8a97-71dad9ddc5c9",
+      "component_ref": "comp_3",
+      "config": {},
+      "local_id": "node_1",
+      "name": "Error Handler - End",
+      "position": {
+        "x": 710.0,
+        "y": 36.0
+      }
+    },
+    {
+      "component_asset_id": "b516a4f7-e9a3-4638-a29f-061cb1d16be9",
+      "component_ref": "comp_2",
+      "config": {},
+      "local_id": "node_2",
+      "name": "Error Handler - Start",
+      "position": {
+        "x": 50.0,
+        "y": 236.0
+      }
+    },
+    {
+      "component_asset_id": "0a2205a1-2d3d-4f2b-8a72-4b48981a5d24",
+      "component_ref": "comp_0",
+      "config": {
+        "_mainflow_target_node_ref": "end",
+        "mainflow_target_node_ref": "node_1",
+        "port_sides": {
+          "": "left"
+        }
+      },
+      "local_id": "node_3",
+      "name": "Error Handler",
+      "position": {
+        "x": 326.0,
+        "y": 220.0
+      }
+    },
+    {
+      "component_asset_id": null,
+      "component_ref": "comp_4",
+      "config": {
+        "port_sides": {
+          "input": "top"
+        }
+      },
+      "local_id": "node_4",
+      "name": "Error Handler - Primary",
+      "position": {
+        "x": 170.0,
+        "y": 620.0
+      }
+    },
+    {
+      "component_asset_id": null,
+      "component_ref": "comp_5",
+      "config": {
+        "port_sides": {
+          "input": "top"
+        }
+      },
+      "local_id": "node_5",
+      "name": "Error Handler - Fallback",
+      "position": {
+        "x": 500.0,
+        "y": 620.0
+      }
+    }
+  ],
+  "orchestration": {
+    "additional_packages": [],
+    "description": "What it does Tries a step, and if it fails, retries it and then falls back to a recovery step. It is how a flow survives something going wrong.\n\nHow it works Wire the real work into the primary slot and the recovery into the fallback slot. The primary runs; if it fails the template retries it up to the limit you set, waiting between attempts and optionally lengthening that wait each time. When the retries are exhausted it either runs the fallback or fails the run, depending on what you chose. A flow without this fails on the first error; with it, a transient outage becomes a pause rather than a failure.\n\nConfigure (on the FSM component inside)\n- Max retries - how many further attempts after the first failure.\n- Retry delay seconds - how long to wait between attempts.\n- Retry backoff - lengthen the wait after each failure instead of keeping it constant.\n- On exhausted - once retries run out, run the fallback slot or fail the run.\n\nIn and out In: whatever the primary step needs. Out: the primary's result, or the fallback's if it was needed.\n\nUse it when\n- A step calls something outside the platform that can be briefly unavailable.\n- You want a cheaper or simpler answer when the preferred path fails.\n- A run should degrade gracefully instead of stopping at the first error.",
+    "disable_intermediate_snapshots": false,
+    "name": "ERROR HANDLER (SYSTEM, READ-ONLY)",
+    "requires_gpu": false,
+    "runtime_config": null,
+    "tags": []
+  },
+  "ports": [
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "output",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "policy",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_0"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "external_input",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "external_output",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "primary",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_4"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "fallback",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_5"
+    }
+  ],
+  "secrets_required": []
+}

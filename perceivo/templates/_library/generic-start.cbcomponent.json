@@ -1,0 +1,167 @@
+{
+  "component": {
+    "additional_packages": null,
+    "artifact_type_input": null,
+    "artifact_type_output": null,
+    "asset_id": null,
+    "category": "START",
+    "config": {
+      "detected_endpoints": [],
+      "extension_id": "651b6671-dced-4d9f-a090-2ca056b34a5d",
+      "input_parameters": {
+        "declarations": [
+          {
+            "_schema_type": "string",
+            "label": "prompt",
+            "name": "prompt",
+            "required": true,
+            "type": "text"
+          },
+          {
+            "_schema_type": "float",
+            "label": "max_length",
+            "name": "max_length",
+            "required": true,
+            "type": "number"
+          }
+        ],
+        "values": {
+          "max_length": 1000,
+          "prompt": "Enter your prompt here"
+        }
+      },
+      "is_generic_start": true,
+      "port_order": [
+        "external_input",
+        "output"
+      ],
+      "icon": {
+        "type": "lucide",
+        "value": "play"
+      }
+    },
+    "description": "What it does The front door of an orchestration. It accepts whatever the caller sends and passes it into the flow without changing it.\n\nHow it works Every orchestration needs exactly one start. This one is deliberately empty of logic: whatever request data and file or document arrive on its external port go out of its output port unchanged. Because it makes no assumptions about the shape of the input, it works for any flow.\n\nConfigure The input contract, in the Inspector: declare the fields the caller must send, their types and whether each is required. Saving the orchestration bakes that contract into this node's own copy; the shared template is never changed.\n\nIn and out In: the caller's request data and, optionally, a file or document. Out: both, unchanged.\n\nUse it when\n- You are building any orchestration and have no special entry requirements.\n- You want the caller's payload to reach the first real component untouched.\n- You are replacing a hand-written start component that only passed data through.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+    "name": "GENERIC START (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "json",
+        "artifact_type_output": "json",
+        "artifact_types": null,
+        "base_schema": null,
+        "contract": {
+          "properties": {
+            "max_length": {
+              "type": "float"
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "prompt",
+            "max_length"
+          ],
+          "type": "object"
+        },
+        "direction": "IN",
+        "key": "external_input",
+        "label": "External Input",
+        "multi_artifact": false,
+        "port_type": "external_in",
+        "post_tool_contract": null,
+        "request_data_schema": {
+          "properties": {
+            "max_length": {
+              "type": "float"
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "prompt",
+            "max_length"
+          ],
+          "type": "object"
+        },
+        "response_data_contract": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_schema": null,
+        "tool_call": false
+      },
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "json",
+        "artifact_type_output": "json",
+        "artifact_types": null,
+        "base_schema": null,
+        "contract": {
+          "properties": {
+            "max_length": {
+              "type": "float"
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "prompt",
+            "max_length"
+          ],
+          "type": "object"
+        },
+        "direction": "OUT",
+        "key": "output",
+        "label": "Output",
+        "multi_artifact": false,
+        "port_type": "out",
+        "post_tool_contract": null,
+        "request_data_schema": {
+          "properties": {
+            "max_length": {
+              "type": "float"
+            },
+            "prompt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "prompt",
+            "max_length"
+          ],
+          "type": "object"
+        },
+        "response_data_contract": null,
+        "response_data_passthrough": null,
+        "response_data_passthrough_except": null,
+        "response_data_schema": null,
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "import perceivo\n\n\n@perceivo.start\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    return perceivo.primitives.StartOutput(\n        artifact=input.artifact,\n        response_data=input.request_data or {},\n        artifacts=input.artifacts or {},\n    )\n",
+    "short_description": "The default entry point: accepts whatever the caller sends and hands it to the flow unchanged.",
+    "tags": [
+      "template",
+      "control-flow",
+      "start"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-07-31T15:29:57.129628Z"
+}

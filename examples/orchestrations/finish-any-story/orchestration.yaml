@@ -1,0 +1,69 @@
+name: Finish Any Story
+description: Type the start of a story; a Claude agent writes the ending. Shows artifacts versus response data.
+nodes:
+- id: node_story_start
+  name: Story Start
+  component_type: START
+  script: story-start/story-start.py
+  manifest: story-start/story-start.yaml
+  position:
+    x: 60
+    y: 200
+- id: node_storyteller
+  name: Storyteller
+  component_type: AGENT
+  script: storyteller/storyteller.py
+  manifest: storyteller/storyteller.yaml
+  position:
+    x: 360
+    y: 200
+- id: node_the_end
+  name: The End
+  component_type: END
+  script: the-end/the-end.py
+  manifest: the-end/the-end.yaml
+  position:
+    x: 660
+    y: 200
+ports:
+- id: port_story_start_external_in
+  node_id: node_story_start
+  name: external_in
+  port_type: external_in
+  direction: IN
+- id: port_story_start_output
+  node_id: node_story_start
+  name: output
+  port_type: out
+  base_schema: StartOut
+  direction: OUT
+- id: port_storyteller_input
+  node_id: node_storyteller
+  name: input
+  port_type: in
+  base_schema: AgentIn
+  direction: IN
+- id: port_storyteller_output
+  node_id: node_storyteller
+  name: output
+  port_type: out
+  base_schema: AgentOut
+  direction: OUT
+- id: port_the_end_input
+  node_id: node_the_end
+  name: input
+  port_type: in
+  base_schema: EndIn
+  direction: IN
+- id: port_the_end_external_out
+  node_id: node_the_end
+  name: external_out
+  port_type: external_out
+  direction: OUT
+edges:
+- source_port_id: port_story_start_output
+  target_port_id: port_storyteller_input
+  kind: MAINFLOW
+- source_port_id: port_storyteller_output
+  target_port_id: port_the_end_input
+  kind: MAINFLOW

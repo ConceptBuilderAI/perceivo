@@ -1,0 +1,48 @@
+extension_type: END
+name: Reply
+description: Returns the expert's answer with the model used and the token counts.
+tags:
+  - beginner
+  - end
+input_ports:
+  - port_name: input
+    port_type: in
+    artifact_type_input: text
+    request_data:
+      answer:
+        type: string
+        description: The expert's reply.
+      model:
+        type: string
+        description: The model that wrote the reply.
+      provider:
+        type: string
+        description: The model provider.
+      tokens_in:
+        type: integer
+        description: Prompt tokens the call used.
+      tokens_out:
+        type: integer
+        description: Completion tokens the call used.
+external_out_port:
+  port_name: external_out
+  port_type: external_out
+  artifact_type_input: text
+  response_data:
+    answer:
+      type: string
+      description: The expert's reply.
+    model:
+      type: string
+      description: The model that wrote the reply.
+    tokens_in:
+      type: integer
+      description: Prompt tokens the call used.
+    tokens_out:
+      type: integer
+      description: Completion tokens the call used.
+    total_tokens:
+      type: integer
+      description: tokens_in plus tokens_out.
+input_parameters: []
+required_secrets: []

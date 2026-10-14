@@ -1,0 +1,596 @@
+{
+  "components": {
+    "comp_0": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "54008d80-ebb7-4fe6-9e87-2ac6ff1d3585",
+      "category": "POLICY",
+      "config": {
+        "detected_endpoints": [],
+        "is_agent_tool_internal": true
+      },
+      "description": "What it does The decision rule for the Parallel Executor: it decides when the group is finished and what to do about failures.\n\nHow it works Watches the slots as they complete, applies the configured failure strategy to any that errored or timed out, and reports when the group is done. It makes no calls of its own and holds no configuration.\n\nConfigure Nothing. Set the timeout and failure strategy on the FSM instead.\n\nIn and out In: the state of the running slots. Out: the decision to finish, and the joined results.\n\nUse it when It comes with the Parallel Executor template. You do not add or configure it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: policy\nname: Parallel Executor Policy\ndescription: >\n  Internal control policy for the Parallel Executor. Merges every branch's\n  response into one payload and stamps it with fan-out metadata.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: none\n    response_data_contract: dynamic\n    response_data_contract_reason: >-\n      One key per branch label from the executor's `states` configuration, plus\n      `_parallel_metadata`; the branch set is configuration-determined.\n    request_data:\n      results: object (optional) - Branch label to response_data mapping.\n      errors: object (optional) - Branch label to error text mapping.\n      failure_strategy: string (optional) - How branch failures were treated.\n\npolicy_states:\n  - state_1\n  - state_2\n",
+      "name": "PARALLEL EXECUTOR - POLICY (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "errors": {
+              "required": false,
+              "type": "object"
+            },
+            "failure_strategy": {
+              "required": false,
+              "type": "string"
+            },
+            "results": {
+              "required": false,
+              "type": "object"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.policy\nasync def parallel_executor_policy_internal(input: perceivo.primitives.PolicyInput) -> perceivo.primitives.PolicyOutput:\n    rd = input.request_data or {}\n    results = rd.get(\"results\", {})\n    errors = rd.get(\"errors\", {})\n    failure_strategy = rd.get(\"failure_strategy\", \"wait_all\")\n\n    # Merge all branch results into a single dict keyed by port name\n    merged = {}\n    for port_name, response in results.items():\n        if isinstance(response, dict):\n            merged[port_name] = response\n\n    # Add metadata\n    merged[\"_parallel_metadata\"] = {\n        \"branches\": list(results.keys()),\n        \"branch_count\": len(results),\n        \"error_count\": len(errors),\n        \"errors\": errors if errors else None,\n        \"failure_strategy\": failure_strategy,\n    }\n\n    perceivo.log.info(f\"Parallel Policy: merged {len(results)} branch results\")\n\n    return perceivo.primitives.PolicyOutput(\n        next_state=\"done\",\n        response_data=merged,\n    )\n",
+      "short_description": "The decision rule for the Parallel Executor: it decides when the group is finished and what",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_1": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "7756e459-bd76-4a64-a5a0-c639fceb7213",
+      "category": "START",
+      "config": {
+        "detected_endpoints": [],
+        "input_parameters": {
+          "declarations": [
+            {
+              "_schema_type": "string",
+              "label": "prompt",
+              "name": "prompt",
+              "required": true,
+              "type": "text"
+            }
+          ],
+          "values": {}
+        },
+        "is_generic_start": true,
+        "port_order": [
+          "external_input",
+          "output"
+        ]
+      },
+      "description": "What it does The entry point of the Parallel Executor template. It accepts the input that every parallel slot will receive.\n\nHow it works Passes the incoming data and any accompanying file straight through to the executor, which hands the same input to each slot.\n\nConfigure Nothing.\n\nIn and out In: the caller's request. Out: the same, unchanged, into the executor.\n\nUse it when It comes with the Parallel Executor template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: start\nname: Generic Start (Prebuilt)\ndescription: Passthrough start component. Define input contract via Inspector.\ninput_ports:\n- port_name: external_input\n  port_type: external_in\n  artifact_type_input: json\n  artifact_type_output: json\noutput_ports:\n- port_name: output\n  port_type: out\n  artifact_type_input: json\n  artifact_type_output: optional(json)\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\ninput_prompt: Provide the input data for this orchestration.\n",
+      "name": "PARALLEL EXECUTOR - START (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "external_input",
+          "label": "External Input",
+          "multi_artifact": false,
+          "port_type": "external_in",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "prompt"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "output",
+          "label": "Output",
+          "multi_artifact": false,
+          "port_type": "out",
+          "post_tool_contract": null,
+          "request_data_schema": {
+            "prompt": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.start\nasync def generic_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    return perceivo.primitives.StartOutput(\n        artifact=input.artifact,\n        response_data=input.request_data or {},\n    )\n",
+      "short_description": "The entry point of the Parallel Executor template. It accepts the input that every parallel",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_2": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "c80b7500-afcf-4b46-ac8b-585a1e25288c",
+      "category": "FSM",
+      "config": {
+        "detected_endpoints": [],
+        "fsm": {
+          "max_steps": 1
+        },
+        "icon": {
+          "type": "lucide",
+          "value": "git-fork"
+        },
+        "input_parameters": {
+          "declarations": [
+            {
+              "constraints": {
+                "max": 3600,
+                "min": 1,
+                "step": 1
+              },
+              "default": 300,
+              "description": "Maximum time to wait for all parallel branches to complete.",
+              "label": "Timeout (seconds)",
+              "name": "timeout_seconds",
+              "type": "number"
+            },
+            {
+              "default": "wait_all",
+              "description": "How to handle branch failures. wait_all: wait for all branches even if some fail. fail_fast: abort all branches on first failure. ignore_failures: continue even if branches fail.",
+              "label": "Failure Strategy",
+              "name": "failure_strategy",
+              "options": [
+                "wait_all",
+                "fail_fast",
+                "ignore_failures"
+              ],
+              "type": "select"
+            },
+            {
+              "default": "[]",
+              "description": "JSON array of state port configurations (managed by Parallel Editor UI).",
+              "label": "States Configuration",
+              "name": "states",
+              "type": "text_long"
+            }
+          ],
+          "values": {
+            "failure_strategy": "wait_all",
+            "states": "[{\"port_name\":\"state_1\",\"label\":\"Support\"},{\"port_name\":\"state_2\",\"label\":\"Refute\"}]",
+            "timeout_seconds": 300
+          }
+        },
+        "is_parallel_executor": true,
+        "port_order": [
+          "input",
+          "state_1",
+          "state_2"
+        ],
+        "port_sides": {
+          "input": "left",
+          "state_1": "bottom",
+          "state_2": "bottom"
+        }
+      },
+      "description": "What it does The engine of the Parallel Executor template. It starts every slot together and joins the results.\n\nHow it works Dispatches all configured slots concurrently, waits for them within the timeout, and collects what came back. Its policy decides how to treat a slot that failed or timed out, according to the failure strategy you chose.\n\nConfigure\n- States - the slots to run concurrently and their components.\n- Timeout seconds - the ceiling on how long to wait for stragglers.\n- Failure strategy - fail the whole step on any error, or continue with the successful\nresults.\n\nIn and out In: the data handed to every slot. Out: the collected results.\n\nUse it when It comes with the Parallel Executor template - configure it there rather than adding it on its own.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: fsm\nname: Parallel Executor\ndescription: >\n  FSM layer that fans out to its wired state slots concurrently as separate Ray\n  tasks, waits for every result, then merges them through the paired policy.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: optional(json)\n    artifact_type_output: json\n    response_data_contract: dynamic\n    response_data_contract_reason: >-\n      The merged payload is whatever the paired policy returns from merging the\n      branches named by the `states` input parameter, so the key set is\n      configuration-determined.\n\nstate_ports:\n  - port_name: state_1\n    artifact_type_input: json\n    artifact_type_output: json\n  - port_name: state_2\n    artifact_type_input: json\n    artifact_type_output: json\n\npolicy_ports:\n  - port_name: policy\n    artifact_type_input: none\n    artifact_type_output: none\n\ninput_parameters:\n  - name: timeout_seconds\n    type: number\n    label: Timeout (seconds)\n    default: 300\n    description: Hard limit on how long the fan-out may take.\n  - name: failure_strategy\n    type: select\n    label: Failure Strategy\n    options: [wait_all, fail_fast, ignore_failures]\n    default: wait_all\n    description: How to treat a branch that raises.\n  - name: states\n    type: text_long\n    label: States Configuration\n    default: \"[]\"\n    description: JSON array of port_name/label pairs naming the slots to fan out to.\n",
+      "name": "PARALLEL EXECUTOR - FSM (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "none",
+          "artifact_type_output": "none",
+          "artifact_types": [
+            "none"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "policy",
+          "label": "Policy",
+          "multi_artifact": false,
+          "port_type": "policy",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "state_1",
+          "label": "State 1",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": [
+            "json"
+          ],
+          "base_schema": null,
+          "contract": {},
+          "direction": "OUT",
+          "key": "state_2",
+          "label": "State 2",
+          "multi_artifact": false,
+          "port_type": "state",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": null,
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\nimport json as _json\n\n\n@perceivo.fsm\nasync def parallel_executor(input: perceivo.primitives.FsmInput) -> perceivo.primitives.FsmOutput:\n    timeout = int(perceivo.params.get(\"timeout_seconds\", 300))\n    failure_strategy = perceivo.params.get(\"failure_strategy\", \"wait_all\")\n    states_raw = perceivo.params.get(\"states\", \"[]\")\n\n    # Parse states configuration\n    try:\n        states = _json.loads(states_raw) if isinstance(states_raw, str) else states_raw\n        if not isinstance(states, list):\n            states = []\n    except (_json.JSONDecodeError, TypeError):\n        states = []\n\n    # Extract state port names and build label map\n    state_ports = (\n        [s.get(\"port_name\", f\"state_{i+1}\") for i, s in enumerate(states)]\n        if states else [\"state_1\", \"state_2\"]\n    )\n\n    # Map port_name -> custom label (falls back to port_name if no label set)\n    port_label_map = {}\n    if states:\n        for i, s in enumerate(states):\n            pn = s.get(\"port_name\", f\"state_{i+1}\")\n            port_label_map[pn] = s.get(\"label\") or pn\n\n    # Gather input data\n    data = input.request_data or {}\n    if input.artifact and input.artifact.data and isinstance(input.artifact.data, dict):\n        data = {**input.artifact.data, **data}\n\n    perceivo.log.info(\n        f\"Parallel Executor: launching {len(state_ports)} parallel branches\",\n        state_ports=state_ports,\n        timeout=timeout,\n        failure_strategy=failure_strategy,\n    )\n\n\n    # Execute all state ports in parallel via invoke_parallel\n    # This uses Ray actors for true parallelism\n    try:\n        results = await perceivo.flow.invoke_parallel(\n            port_names=state_ports,\n            request_data=data,\n            artifact=input.artifact,\n            timeout_seconds=timeout,\n            failure_strategy=failure_strategy,\n        )\n    except Exception as e:\n        if failure_strategy == \"ignore_failures\":\n            perceivo.log.warning(f\"Parallel Executor: parallel execution failed but ignoring: {e}\")\n            results = {}\n        else:\n            raise\n\n    # Extract response data and errors, using custom labels as keys\n    branch_results = {}\n    branch_errors = {}\n    for port_name, result in results.items():\n        label = port_label_map.get(port_name, port_name)\n        if isinstance(result, dict):\n            if result.get(\"error\"):\n                branch_errors[label] = result[\"error\"]\n            branch_results[label] = result.get(\"response_data\", {})\n        else:\n            branch_results[label] = {}\n\n    perceivo.log.info(f\"Parallel Executor: {len(branch_results)} branches completed, {len(branch_errors)} errors\")\n\n    # Send results to policy for merge/aggregation\n    policy_result = await perceivo.flow.invoke(\n        port_name=\"policy\",\n        request_data={\n            \"results\": branch_results,\n            \"errors\": branch_errors,\n            \"failure_strategy\": failure_strategy,\n        },\n    )\n\n    # Get merged output from policy\n    merged = {}\n    if policy_result and isinstance(policy_result, dict):\n        merged = policy_result.get(\"response_data\", {})\n\n    return perceivo.primitives.FsmOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=merged,\n            mime_type=\"application/json\",\n        ),\n        response_data=merged,\n    )\n",
+      "short_description": "The engine of the Parallel Executor template. It starts every slot together and joins the",
+      "tags": [],
+      "template_source_id": null
+    },
+    "comp_3": {
+      "additional_packages": null,
+      "artifact_type_input": null,
+      "artifact_type_output": null,
+      "asset_id": "c8f25c87-5dd0-482f-b5ed-6155182ba9c5",
+      "category": "END",
+      "config": {
+        "detected_endpoints": [],
+        "is_generic_end": true,
+        "output_parameters": {
+          "declarations": [],
+          "values": {}
+        },
+        "port_order": [
+          "input",
+          "external_output"
+        ]
+      },
+      "description": "What it does The exit of the Parallel Executor template. It returns the joined results of all the slots.\n\nHow it works Takes the collected results and returns them as the result of the nested run, so the parent flow can carry on. It adds nothing of its own.\n\nConfigure Nothing.\n\nIn and out In: the joined results of the parallel slots. Out: the same data, as the template's result.\n\nUse it when It comes with the Parallel Executor template. You do not add it separately.",
+      "fsm_states": [],
+      "is_prebuilt_reference": false,
+      "is_template_clone": false,
+      "manifest_yaml": "extension_type: end\nname: Generic End (Prebuilt)\ndescription: Passthrough end component. Define output contract via Inspector.\ninput_ports:\n- port_name: input\n  port_type: in\n  artifact_type_input: optional(json)\n  artifact_type_output: json\nexternal_out_port:\n  port_name: external_output\n  port_type: external_out\n  artifact_type_input: json\n  artifact_type_output: json\n  response_data_contract: dynamic\n  response_data_contract_reason: 'Passthrough component: response_data is forwarded from the run''s own\n    data, whose fields are supplied by the orchestration at run time and cannot be enumerated statically.'\ninput_parameters: []\n",
+      "name": "PARALLEL EXECUTOR - END (SYSTEM, READ-ONLY)",
+      "ports": [
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "IN",
+          "key": "input",
+          "label": "Input",
+          "multi_artifact": false,
+          "port_type": "in",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        },
+        {
+          "allowed_states": null,
+          "artifact_input_schema": null,
+          "artifact_output_schema": null,
+          "artifact_type_constraint": null,
+          "artifact_type_input": "json",
+          "artifact_type_output": "json",
+          "artifact_types": null,
+          "base_schema": null,
+          "contract": {
+            "properties": {
+              "Refute": {
+                "type": "string"
+              },
+              "Support": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "Support",
+              "Refute"
+            ],
+            "type": "object"
+          },
+          "direction": "OUT",
+          "key": "external_output",
+          "label": "External Output",
+          "multi_artifact": false,
+          "port_type": "external_out",
+          "post_tool_contract": null,
+          "request_data_schema": null,
+          "response_data_schema": {
+            "Refute": {
+              "required": true,
+              "type": "string"
+            },
+            "Support": {
+              "required": true,
+              "type": "string"
+            }
+          },
+          "tool_call": false
+        }
+      ],
+      "prebuilt_asset_id": null,
+      "requires_gpu": false,
+      "script": "import perceivo\n\n\n@perceivo.end\nasync def generic_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data=input.response_data or {},\n    )\n",
+      "short_description": "The exit of the Parallel Executor template. It returns the joined results of all the slots.",
+      "tags": [],
+      "template_source_id": null
+    }
+  },
+  "edges": [
+    {
+      "edge_kind": "MAINFLOW",
+      "source_port_index": 0,
+      "target_port_index": 1
+    },
+    {
+      "edge_kind": "INVOKE",
+      "source_port_index": 2,
+      "target_port_index": 3
+    }
+  ],
+  "export_type": "orchestration",
+  "export_version": "1.0",
+  "exported_at": "2026-07-18T02:12:22.708458Z",
+  "nodes": [
+    {
+      "component_asset_id": "54008d80-ebb7-4fe6-9e87-2ac6ff1d3585",
+      "component_ref": "comp_0",
+      "config": {
+        "port_sides": {
+          "": "top"
+        }
+      },
+      "local_id": "node_0",
+      "name": "Parallel Executor Policy",
+      "position": {
+        "x": 326.0,
+        "y": 430.0
+      }
+    },
+    {
+      "component_asset_id": "7756e459-bd76-4a64-a5a0-c639fceb7213",
+      "component_ref": "comp_1",
+      "config": {},
+      "local_id": "node_1",
+      "name": "Parallel Executor - Start",
+      "position": {
+        "x": 50.0,
+        "y": 236.0
+      }
+    },
+    {
+      "component_asset_id": "c80b7500-afcf-4b46-ac8b-585a1e25288c",
+      "component_ref": "comp_2",
+      "config": {
+        "_mainflow_target_node_ref": "end",
+        "mainflow_target_node_ref": "node_3",
+        "port_sides": {
+          "": "left"
+        }
+      },
+      "local_id": "node_2",
+      "name": "Parallel Executor",
+      "position": {
+        "x": 326.0,
+        "y": 220.0
+      }
+    },
+    {
+      "component_asset_id": "c8f25c87-5dd0-482f-b5ed-6155182ba9c5",
+      "component_ref": "comp_3",
+      "config": {},
+      "local_id": "node_3",
+      "name": "Parallel Executor - End",
+      "position": {
+        "x": 710.0,
+        "y": 36.0
+      }
+    }
+  ],
+  "orchestration": {
+    "additional_packages": [],
+    "description": "What it does Runs several steps at the same time and waits for them all, instead of one after another. Use it when the steps do not depend on each other.\n\nHow it works Wire a component into each slot; every slot starts together and the template waits for them to finish before continuing. Total time is roughly the slowest step rather than the sum of all of them. A timeout bounds the wait, and you choose what should happen if one of them fails: stop the whole thing, or carry on with the results you did get.\n\nConfigure (on the FSM component inside)\n- States - the slots to run concurrently, and what runs in each.\n- Timeout seconds - how long to wait before giving up on stragglers.\n- Failure strategy - whether one failure fails the whole step, or the run continues with\nwhatever succeeded.\n\nIn and out In: the data given to every slot. Out: the results of all slots, collected together.\n\nUse it when\n- Several independent lookups or model calls can happen at once.\n- You are fanning the same question out to multiple models or sources to compare.\n- A slow set of steps has no ordering requirement and latency matters.",
+    "disable_intermediate_snapshots": false,
+    "name": "PARALLEL EXECUTOR (SYSTEM, READ-ONLY)",
+    "requires_gpu": false,
+    "runtime_config": null,
+    "tags": []
+  },
+  "ports": [
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "output",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "policy",
+      "effective_contract": null,
+      "node_ref": "node_2"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_0"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "input",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "IN",
+      "component_port_key": "external_input",
+      "effective_contract": null,
+      "node_ref": "node_1"
+    },
+    {
+      "alias": null,
+      "component_port_direction": "OUT",
+      "component_port_key": "external_output",
+      "effective_contract": null,
+      "node_ref": "node_3"
+    }
+  ],
+  "secrets_required": []
+}

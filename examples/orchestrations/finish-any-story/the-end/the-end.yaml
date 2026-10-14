@@ -1,0 +1,45 @@
+extension_type: END
+name: The End
+description: Returns the finished story as the artifact and a short summary as response data.
+tags:
+  - beginner
+  - end
+input_ports:
+  - port_name: input
+    port_type: in
+    artifact_type_input: text
+    request_data:
+      words_in_opening:
+        type: integer
+        description: How many words the opening had.
+      words_added:
+        type: integer
+        description: How many words the ending added.
+      model:
+        type: string
+        description: The model that wrote the ending.
+      provider:
+        type: string
+        description: The model provider.
+      tokens_in:
+        type: integer
+        description: Prompt tokens the call used.
+      tokens_out:
+        type: integer
+        description: Completion tokens the call used.
+external_out_port:
+  port_name: external_out
+  port_type: external_out
+  artifact_type_input: text
+  response_data:
+    total_words:
+      type: integer
+      description: Words in the finished story.
+    words_added:
+      type: integer
+      description: How many words the ending added.
+    model:
+      type: string
+      description: The model that wrote the ending.
+input_parameters: []
+required_secrets: []

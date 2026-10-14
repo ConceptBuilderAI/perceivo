@@ -1,0 +1,30 @@
+extension_type: TOOL
+name: Inspection
+description: Stage 4 of the production line. Inspects the finished product, then returns the result.
+tags:
+  - beginner
+  - tool
+input_ports:
+  - port_name: input
+    port_type: in
+    artifact_type_input: none
+    artifact_type_output: none
+    request_data:
+      product:
+        type: string
+        description: What the line is making.
+      seconds:
+        type: integer
+        description: How long each stage works.
+      traveler:
+        type: string
+        description: The record of stages finished so far.
+    response_data:
+      traveler:
+        type: string
+        description: The record of every stage, ending with Inspection.
+      passed:
+        type: boolean
+        description: Whether the product passed inspection.
+input_parameters: []
+required_secrets: []

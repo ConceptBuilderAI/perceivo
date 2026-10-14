@@ -1,0 +1,182 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "AI FOUNDRY GPT-5-NANO AGENT (SYSTEM, READ-ONLY)",
+    "category": "AGENT",
+    "description": "What it does Sends a prompt to GPT-5-nano, a model the platform runs for you in Azure AI Foundry, and returns the reply. There is no API key to bind: the platform holds the credentials.\n\nHow it works Write a system prompt - the standing instruction - and a user prompt - the message. Anything in ${braces} is filled in from the data arriving at the node, so the default ${prompt} sends whatever arrives in the prompt field. If the user prompt is blank, or names a field that did not arrive, the incoming data itself is sent instead. The tokens used are priced from the platform's model catalogue and recorded against the run. If the call fails, or the model answers with no text, the run fails rather than passing an empty answer on.\n\nConfigure\n- Model - gpt-5-nano by default; any other managed model in the list can be chosen.\n- System Prompt - the standing instruction. \"You are a helpful assistant.\" by default.\n- User Prompt - the message. ${prompt} by default.\n- Temperature - 0 to 2, 0.7 by default. Lower is more predictable.\n- Max Tokens - ceiling on the reply length, 4000 by default.\n- Reasoning Effort - low, medium or high, for reasoning models. Blank leaves it to the model.\n\nIn and out In: data whose fields fill the ${...} placeholders, or a JSON artifact to send as it is. Out: the reply, the model that answered, the input and output token counts, and a one-line summary of the call.\n\nUse it when\n- A high-volume step - tagging, routing, short summaries - where speed and cost matter more than depth.\n- You want a managed model without bringing your own key.\n- You want the token counts of a step passed on with its reply.",
+    "short_description": "Sends a prompt to the platform-managed GPT-5-nano model and returns the reply with its token counts - no API key needed.",
+    "tags": [
+      "template",
+      "agent",
+      "llm",
+      "azure-ai-foundry",
+      "gpt-5-nano"
+    ],
+    "config": {
+      "input_parameters": {
+        "values": {
+          "model": "gpt-5-nano",
+          "system_prompt": "You are a helpful assistant.",
+          "user_prompt": "${prompt}",
+          "temperature": 0.7,
+          "max_tokens": 4000,
+          "reasoning_effort": ""
+        },
+        "declarations": [
+          {
+            "name": "model",
+            "type": "select",
+            "label": "Model",
+            "options": [
+              "gpt-5.2",
+              "gpt-5-nano",
+              "o4-mini",
+              "grok-4-1-fast-reasoning"
+            ],
+            "default": "gpt-5-nano",
+            "required": true,
+            "description": "Managed Azure AI Foundry model to call. The platform holds the credentials."
+          },
+          {
+            "name": "system_prompt",
+            "type": "text_long",
+            "label": "System Prompt",
+            "default": "You are a helpful assistant.",
+            "required": true,
+            "description": "Standing instruction for the model. ${field} placeholders are filled from incoming data."
+          },
+          {
+            "name": "user_prompt",
+            "type": "text_long",
+            "label": "User Prompt",
+            "default": "${prompt}",
+            "required": false,
+            "description": "The message. ${field} or ${nested.field} is filled from incoming data. When blank, or when a named field is missing, the incoming artifact or data is sent instead."
+          },
+          {
+            "name": "temperature",
+            "type": "number",
+            "label": "Temperature",
+            "default": 0.7,
+            "required": false,
+            "constraints": {
+              "min": 0,
+              "max": 2,
+              "step": 0.1
+            },
+            "description": "Lower is more predictable, higher more varied."
+          },
+          {
+            "name": "max_tokens",
+            "type": "integer",
+            "label": "Max Tokens",
+            "default": 4000,
+            "required": false,
+            "constraints": {
+              "min": 100,
+              "max": 100000
+            },
+            "description": "Ceiling on the reply length. Reasoning models spend part of it thinking."
+          },
+          {
+            "name": "reasoning_effort",
+            "type": "select",
+            "label": "Reasoning Effort",
+            "options": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "default": "",
+            "required": false,
+            "description": "For reasoning models only. Leave blank to let the model decide."
+          }
+        ]
+      },
+      "detected_endpoints": [
+        {
+          "category": "perceivo_sdk",
+          "library": "perceivo.managed_service.ai",
+          "host": null,
+          "confidence": "detected",
+          "description": "Perceivo managed AI inference"
+        }
+      ],
+      "icon": {
+        "type": "lucide",
+        "value": "bot"
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "json",
+    "artifact_type_output": "json",
+    "script": "\"\"\"AI Foundry GPT-5-nano Agent: one call to a platform-managed Azure AI Foundry model.\n\nThe platform holds the model credentials, so nothing is bound on the node: the\ncall goes through ``perceivo.managed_service.ai`` and is authenticated\nserver-side. The platform books the call's tokens as it serves it, so the script\nrecords no cost of its own; the token counts are returned with the reply.\n\"\"\"\n\nimport json\nimport re\n\nimport perceivo\n\n_DEFAULT_MODEL = \"gpt-5-nano\"\n_DEFAULT_SYSTEM_PROMPT = \"You are a helpful assistant.\"\n_DEFAULT_USER_PROMPT = \"${prompt}\"\n_REASONING_EFFORTS = (\"low\", \"medium\", \"high\")\n\n# ${field} or ${nested.field}, filled from the inbound request_data.\n_PLACEHOLDER = re.compile(r\"\\$\\{([\\w.]+)\\}\")\n_ABSENT = object()\n\n\ndef _lookup(data, path: str):\n    \"\"\"The value at a dotted path inside nested dicts, or _ABSENT.\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if not isinstance(value, dict) or part not in value:\n            return _ABSENT\n        value = value[part]\n    return value\n\n\ndef _as_text(value) -> str:\n    return value if isinstance(value, str) else json.dumps(value, default=str)\n\n\ndef _fill(template: str, data: dict) -> str:\n    \"\"\"Replace each ${path} found in data; leave unknown placeholders as written.\"\"\"\n\n    def _replace(match):\n        value = _lookup(data, match.group(1))\n        return match.group(0) if value is _ABSENT else _as_text(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _text_param(name: str, default: str) -> str:\n    value = perceivo.params.get(name, default)\n    return default if value is None else str(value)\n\n\ndef _number_param(name: str, label: str, default, low, high, integer: bool = False):\n    \"\"\"A numeric node parameter, checked against the range the Inspector offers.\"\"\"\n    raw = perceivo.params.get(name, default)\n    if raw is None or raw == \"\":\n        raw = default\n    try:\n        value = float(raw)\n    except (TypeError, ValueError):\n        raise ValueError(f\"{label} is {raw!r}; it must be a number.\") from None\n    if integer:\n        if not value.is_integer():\n            raise ValueError(f\"{label} is {raw!r}; it must be a whole number.\")\n        value = int(value)\n    if not low <= value <= high:\n        raise ValueError(f\"{label} is {raw!r}; it must be between {low} and {high}.\")\n    return value\n\n\ndef _user_message(artifact_data, request_data: dict) -> str:\n    \"\"\"The User Prompt with its placeholders filled, or the inbound data itself.\n\n    When the prompt is blank, or names a field the inbound data does not carry,\n    the inbound artifact is sent instead, then the whole request_data as JSON.\n    \"\"\"\n    prompt = _fill(_text_param(\"user_prompt\", _DEFAULT_USER_PROMPT), request_data).strip()\n    if prompt and not _PLACEHOLDER.search(prompt):\n        return prompt\n    if artifact_data not in (None, \"\", {}, []):\n        return _as_text(artifact_data)\n    if request_data:\n        return json.dumps(request_data, default=str)\n    raise ValueError(\n        \"There is nothing to send to the model: the User Prompt is empty or names \"\n        \"a field the incoming data does not carry, and no data arrived at the node. \"\n        f\"Fields received: {sorted(request_data)}.\"\n    )\n\n\ndef _preview(text: str, limit: int) -> str:\n    flat = \" \".join(text.split())\n    return flat if len(flat) <= limit else flat[:limit] + \"...\"\n\n\n@perceivo.agent\nasync def ai_foundry_gpt_5_nano_agent(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Send one prompt to a managed AI Foundry model and return its reply.\n\n    The model, prompts and sampling settings are node parameters. ${field}\n    placeholders in either prompt are filled from the inbound request_data.\n\n    A misconfigured node raises ValueError before any call is made. A failed\n    model call raises from ``perceivo.managed_service.ai.invoke`` and is not\n    caught, and a reply with no text raises RuntimeError: the run fails rather\n    than passing an empty answer downstream.\n    \"\"\"\n    request_data = input.request_data or {}\n\n    model = _text_param(\"model\", _DEFAULT_MODEL).strip() or _DEFAULT_MODEL\n    temperature = _number_param(\"temperature\", \"Temperature\", 0.7, 0, 2)\n    max_tokens = _number_param(\"max_tokens\", \"Max Tokens\", 4000, 100, 100_000, integer=True)\n    reasoning_effort = _text_param(\"reasoning_effort\", \"\").strip().lower()\n    if reasoning_effort and reasoning_effort not in _REASONING_EFFORTS:\n        raise ValueError(\n            f\"Reasoning Effort is {reasoning_effort!r}. Choose one of: \"\n            f\"{', '.join(_REASONING_EFFORTS)}, or leave it blank.\"\n        )\n    system_prompt = (\n        _fill(_text_param(\"system_prompt\", _DEFAULT_SYSTEM_PROMPT), request_data).strip()\n        or _DEFAULT_SYSTEM_PROMPT\n    )\n    artifact_data = input.artifact.data if input.artifact is not None else None\n    user_message = _user_message(artifact_data, request_data)\n\n    options = {\"temperature\": temperature, \"max_tokens\": max_tokens}\n    if reasoning_effort:\n        options[\"reasoning_effort\"] = reasoning_effort\n\n    perceivo.log.info(\n        \"Calling managed model\",\n        model=model,\n        prompt_chars=len(user_message),\n        **options,\n    )\n    response = await perceivo.managed_service.ai.invoke(\n        perceivo.types.AIService.CHAT,\n        model=model,\n        messages=[{\"role\": \"user\", \"content\": user_message}],\n        system_prompt=system_prompt,\n        **options,\n    )\n\n    choice = (response.get(\"choices\") or [{}])[0] or {}\n    reply = (choice.get(\"message\") or {}).get(\"content\") or \"\"\n    finish_reason = choice.get(\"finish_reason\") or \"\"\n    tokens_in = int(response.get(\"tokens_in\") or 0)\n    tokens_out = int(response.get(\"tokens_out\") or 0)\n\n    if not reply.strip():\n        raise RuntimeError(\n            f\"Model {model!r} returned no text (finish_reason={finish_reason or 'unset'}, \"\n            f\"{tokens_out} output tokens, Max Tokens {max_tokens}). A reasoning model can \"\n            \"spend the whole budget before answering: raise Max Tokens or lower Reasoning Effort.\"\n        )\n\n    summary = (\n        f\"[AI Foundry {model}] Role: {_preview(system_prompt, 150)} | \"\n        f\"Processed {len(user_message)} chars of input. \"\n        f\"Response ({len(reply)} chars): {_preview(reply, 200)}\"\n    )\n    perceivo.log.info(\n        \"Model replied\",\n        model=model,\n        reply_chars=len(reply),\n        tokens_in=tokens_in,\n        tokens_out=tokens_out,\n    )\n\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data={\n                \"response\": reply,\n                \"model\": model,\n                \"tokens_in\": tokens_in,\n                \"tokens_out\": tokens_out,\n                \"conversation_log\": summary,\n            },\n            mime_type=\"application/json\",\n        ),\n        response_data={\n            \"response\": reply,\n            \"model\": model,\n            \"tokens_in\": tokens_in,\n            \"tokens_out\": tokens_out,\n            \"conversation_log\": summary,\n        },\n        conversation_log=perceivo.log.conversation.ConversationMessage(\n            role=\"agent\",\n            parts=[\n                perceivo.log.conversation.ContentPart(\"text/plain\", summary, name=\"summary\"),\n                perceivo.log.conversation.ContentPart(\"text/plain\", reply, name=\"response\"),\n            ],\n            metadata={\"model\": model, \"tokens_in\": tokens_in, \"tokens_out\": tokens_out},\n        ),\n    )\n",
+    "manifest_yaml": "extension_type: agent\nname: AI Foundry GPT-5-nano Agent\ndescription: >\n  Sends one prompt to a platform-managed Azure AI Foundry model (gpt-5-nano by\n  default) through perceivo.managed_service.ai and returns the reply with its\n  token counts. ${field} placeholders in the prompts are filled from\n  request_data. The platform books the token cost. A failed call or an\n  empty reply raises and fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The artifact is read only as a fallback for the user message, so it is\n    # welcome but never required.\n    artifact_type_input: optional(json)\n    # Placeholders read request_data by whatever name the prompts give, so no\n    # key is required. `prompt` is the one the default User Prompt reads.\n    request_data:\n      prompt: string (optional) - The user message, read by the default User Prompt ${prompt}.\n    artifact_type_output: json\n    response_data:\n      response: string - The model's reply.\n      model: string - The model that answered.\n      tokens_in: integer - Prompt tokens consumed.\n      tokens_out: integer - Reply tokens consumed, including any reasoning tokens.\n      conversation_log: string - One-line summary of the call.\n\ninput_parameters:\n- name: model\n  type: select\n  label: Model\n  options:\n  - gpt-5.2\n  - gpt-5-nano\n  - o4-mini\n  - grok-4-1-fast-reasoning\n  default: gpt-5-nano\n  required: true\n  description: Managed Azure AI Foundry model to call. The platform holds the credentials.\n- name: system_prompt\n  type: text_long\n  label: System Prompt\n  default: You are a helpful assistant.\n  required: true\n  description: Standing instruction for the model. ${field} placeholders are filled from incoming data.\n- name: user_prompt\n  type: text_long\n  label: User Prompt\n  default: ${prompt}\n  required: false\n  description: The message. ${field} or ${nested.field} is filled from incoming data. When blank, or when a named field is missing, the incoming artifact or data is sent instead.\n- name: temperature\n  type: number\n  label: Temperature\n  default: 0.7\n  required: false\n  constraints:\n    min: 0\n    max: 2\n    step: 0.1\n  description: Lower is more predictable, higher more varied.\n- name: max_tokens\n  type: integer\n  label: Max Tokens\n  default: 4000\n  required: false\n  constraints:\n    min: 100\n    max: 100000\n  description: Ceiling on the reply length. Reasoning models spend part of it thinking.\n- name: reasoning_effort\n  type: select\n  label: Reasoning Effort\n  options:\n  - low\n  - medium\n  - high\n  default: ''\n  required: false\n  description: For reasoning models only. Leave blank to let the model decide.\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": {
+          "prompt": {
+            "type": "string",
+            "required": false,
+            "description": "The user message, read by the default User Prompt ${prompt}."
+          }
+        },
+        "response_data_schema": {
+          "response": {
+            "type": "string",
+            "required": true,
+            "description": "The model's reply."
+          },
+          "model": {
+            "type": "string",
+            "required": true,
+            "description": "The model that answered."
+          },
+          "tokens_in": {
+            "type": "integer",
+            "required": true,
+            "description": "Prompt tokens consumed."
+          },
+          "tokens_out": {
+            "type": "integer",
+            "required": true,
+            "description": "Reply tokens consumed, including any reasoning tokens."
+          },
+          "conversation_log": {
+            "type": "string",
+            "required": true,
+            "description": "One-line summary of the call."
+          }
+        },
+        "artifact_type_input": "optional(json)",
+        "artifact_type_output": "json",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": false,
+        "artifact_types": [
+          "json"
+        ],
+        "response_data_passthrough_except": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

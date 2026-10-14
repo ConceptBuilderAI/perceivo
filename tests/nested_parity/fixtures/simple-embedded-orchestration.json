@@ -1,0 +1,1059 @@
+{
+ "export_version": "1.0",
+ "export_type": "orchestration",
+ "exported_at": null,
+ "orchestration": {
+  "name": "Simple embedded orchestration",
+  "description": "Embeds one orchestration inside another. The parent starts a run, hands control to the embedded Simple ChatGPT agent, and returns the child's output through the parent's END component -- which asserts the child really executed. Embedding node execution_mode: subprocess.",
+  "runtime_config": {
+   "cpu_request": "500m",
+   "cpu_limit": "1000m",
+   "memory_request": "512Mi",
+   "memory_limit": "2Gi",
+   "gpu_limit": "0"
+  }
+ },
+ "new_name": "Simple embedded orchestration",
+ "organization_id": "adddd6b6-033e-4056-b6b3-bd87d2405618",
+ "components": {
+  "c_start": {
+   "asset_id": null,
+   "name": "Embedded Start",
+   "category": "START",
+   "description": "Start component for the Simple embedded orchestration. Validates the request and hands it to the embedded child orchestration.",
+   "short_description": "Validate the request and hand it to the embedded child orchestration.",
+   "tags": [
+    "sample",
+    "nested",
+    "start"
+   ],
+   "config": {
+    "port_order": [
+     "external_input",
+     "output"
+    ],
+    "is_generic_start": true,
+    "input_parameters": {
+     "values": {
+      "prompt": "Name three uses for a nested orchestration, one line each.",
+      "max_length": 300
+     },
+     "declarations": [
+      {
+       "name": "prompt",
+       "type": "text_long",
+       "label": "Prompt",
+       "required": true,
+       "_schema_type": "string",
+       "description": "The user prompt, forwarded to the embedded child orchestration."
+      },
+      {
+       "name": "max_length",
+       "type": "number",
+       "label": "Max Length",
+       "required": false,
+       "default": 1000,
+       "_schema_type": "integer",
+       "description": "Soft response-length budget in tokens."
+      }
+     ]
+    }
+   },
+   "additional_packages": null,
+   "requires_gpu": false,
+   "artifact_type_input": null,
+   "artifact_type_output": null,
+   "script": "import perceivo\n\n\n@perceivo.start\nasync def embedded_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    \"\"\"Validate the request and hand it to the embedded child orchestration.\"\"\"\n    request_data = input.request_data or {}\n\n    prompt = request_data.get(\"prompt\")\n    if not isinstance(prompt, str) or not prompt.strip():\n        raise ValueError(\"prompt is required and must be a non-empty string\")\n    prompt = prompt.strip()\n\n    # max_length is optional. Reject bool explicitly: bool is a subclass of int\n    # in Python, so `isinstance(True, int)` is True and True would become 1.\n    max_length = request_data.get(\"max_length\")\n    if isinstance(max_length, bool) or not isinstance(max_length, (int, float)):\n        max_length = 1000\n    max_length = int(max_length)\n    if max_length < 1:\n        raise ValueError(f\"max_length must be positive, got {max_length}\")\n\n    perceivo.log.info(\n        \"Simple embedded orchestration started\",\n        prompt_length=len(prompt),\n        max_length=max_length,\n    )\n\n    payload = {\n        \"prompt\": prompt,\n        \"max_length\": max_length,\n    }\n\n    # The child orchestration's auto-generated `orchestration` port declares a\n    # json input artifact and REQUIRES both prompt and max_length in\n    # request_data -- it inherits that contract from the child's own START.\n    return perceivo.primitives.StartOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=payload,\n            mime_type=\"application/json\",\n        ),\n        response_data={\n            \"prompt\": payload[\"prompt\"],\n            \"max_length\": payload[\"max_length\"],\n        },\n    )\n",
+   "manifest_yaml": "name: EmbeddedStart\ndescription: |\n  Start component for the Simple embedded orchestration.\n  Validates the incoming request and passes it to the embedded child\n  orchestration node (Simple ChatGPT agent).\n\nextension_type: start\n\nuse_cases:\n  - Front door for a parent orchestration that delegates to a child\n  - Satisfying an embedded orchestration's inherited request_data contract\n  - Demonstrating nested-orchestration composition without custom glue code\n\nexternal_in_port:\n  port_name: trigger\n  request_data:\n    prompt: string - The user prompt, forwarded to the embedded child orchestration\n    max_length: number (optional) - Soft response-length budget in tokens (default 1000)\n\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_output: json\n    response_data:\n      prompt: string - The validated, whitespace-trimmed user prompt\n      max_length: number - The resolved response-length budget\n\nsample_test_input:\n  request_data:\n    prompt: Name three uses for a nested orchestration, one line each.\n    max_length: 300\n\nnotes: |\n  Pipeline flow: [START] -> Simple ChatGPT agent (embedded) -> END\n\n  The embedded node's `orchestration` port is AUTO-GENERATED from the child\n  orchestration's own START and END ports. For this child it requires BOTH\n  `prompt` and `max_length` in request_data and declares a `json` input\n  artifact, so this START must supply both fields and emit a json artifact or\n  the parent will fail edge validation at import time.\n\ninput_prompt: >\n  Enter the prompt to forward to the embedded Simple ChatGPT agent, and\n  optionally a response length budget in tokens.\n",
+   "ports": [
+    {
+     "direction": "IN",
+     "key": "trigger",
+     "label": "Trigger",
+     "port_type": "external_in",
+     "contract": {},
+     "tool_call": false,
+     "post_tool_contract": null,
+     "base_schema": null,
+     "artifact_type_constraint": null,
+     "allowed_states": null,
+     "request_data_schema": {
+      "prompt": {
+       "type": "string",
+       "description": "The user prompt to forward to the child",
+       "required": true
+      },
+      "max_length": {
+       "type": "integer",
+       "description": "Soft response-length budget in tokens",
+       "required": false
+      }
+     },
+     "response_data_schema": null,
+     "artifact_type_input": null,
+     "artifact_type_output": "none",
+     "artifact_input_schema": null,
+     "artifact_output_schema": null,
+     "multi_artifact": false,
+     "artifact_types": [
+      "none"
+     ]
+    },
+    {
+     "direction": "OUT",
+     "key": "output",
+     "label": "Output",
+     "port_type": "out",
+     "contract": {},
+     "tool_call": false,
+     "post_tool_contract": null,
+     "base_schema": null,
+     "artifact_type_constraint": null,
+     "allowed_states": null,
+     "request_data_schema": null,
+     "response_data_schema": {
+      "prompt": {
+       "type": "string",
+       "description": "The validated user prompt",
+       "required": true
+      },
+      "max_length": {
+       "type": "integer",
+       "description": "The resolved response-length budget",
+       "required": true
+      }
+     },
+     "artifact_type_input": null,
+     "artifact_type_output": "json",
+     "artifact_input_schema": null,
+     "artifact_output_schema": null,
+     "multi_artifact": false,
+     "artifact_types": [
+      "json"
+     ]
+    }
+   ],
+   "fsm_states": [],
+   "is_template_clone": false,
+   "template_source_id": null,
+   "is_prebuilt_reference": false,
+   "prebuilt_asset_id": null
+  },
+  "c_end": {
+   "asset_id": null,
+   "name": "Embedded End",
+   "category": "END",
+   "description": "End component for the Simple embedded orchestration. Returns the embedded child's result and asserts the child actually executed.",
+   "short_description": "Return the child's result and prove the child actually ran.",
+   "tags": [
+    "sample",
+    "nested",
+    "end"
+   ],
+   "config": {
+    "port_order": [
+     "input",
+     "external_output"
+    ],
+    "is_generic_end": true,
+    "output_parameters": {
+     "values": {},
+     "declarations": [
+      {
+       "name": "status",
+       "type": "text",
+       "label": "status",
+       "required": true,
+       "_schema_type": "string"
+      },
+      {
+       "name": "child_executed",
+       "type": "boolean",
+       "label": "child_executed",
+       "required": true,
+       "_schema_type": "boolean"
+      },
+      {
+       "name": "child_status",
+       "type": "text",
+       "label": "child_status",
+       "required": true,
+       "_schema_type": "string"
+      },
+      {
+       "name": "response",
+       "type": "text",
+       "label": "response",
+       "required": true,
+       "_schema_type": "string"
+      },
+      {
+       "name": "tokens_in",
+       "type": "number",
+       "label": "tokens_in",
+       "required": true,
+       "_schema_type": "integer"
+      },
+      {
+       "name": "tokens_out",
+       "type": "number",
+       "label": "tokens_out",
+       "required": true,
+       "_schema_type": "integer"
+      },
+      {
+       "name": "model",
+       "type": "text",
+       "label": "model",
+       "required": true,
+       "_schema_type": "string"
+      },
+      {
+       "name": "provider",
+       "type": "text",
+       "label": "provider",
+       "required": true,
+       "_schema_type": "string"
+      }
+     ]
+    }
+   },
+   "additional_packages": null,
+   "requires_gpu": false,
+   "artifact_type_input": null,
+   "artifact_type_output": null,
+   "script": "import json\n\nimport perceivo\n\n\n@perceivo.end\nasync def embedded_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    \"\"\"Return the embedded child's result and prove the child actually ran.\"\"\"\n    rd = input.response_data or {}\n\n    response = rd.get(\"response\")\n    tokens_in = rd.get(\"tokens_in\", 0)\n    tokens_out = rd.get(\"tokens_out\", 0)\n    model = rd.get(\"model\", \"unknown\")\n    provider = rd.get(\"provider\", \"unknown\")\n    # `status` is produced by the CHILD's END component, so it is only present\n    # in subprocess mode. Inline execution flattens the child into the parent\n    # and REMOVES the child's START/END, so no child status is ever emitted.\n    child_status = rd.get(\"status\", \"not_reported\")\n\n    # Mode-agnostic proof of execution: a skipped child would leave NO model\n    # output at all. Requiring a non-empty response plus real completion tokens\n    # holds in both inline and subprocess mode, whereas asserting on\n    # child_status would fail inline for a child that ran perfectly.\n    child_executed = bool(response) and tokens_out > 0\n\n    summary = {\n        \"status\": \"success\" if child_executed else \"failed\",\n        \"child_executed\": child_executed,\n        \"child_status\": child_status,\n        \"response\": response or \"\",\n        \"tokens_in\": tokens_in,\n        \"tokens_out\": tokens_out,\n        \"model\": model,\n        \"provider\": provider,\n    }\n\n    perceivo.log.info(\n        \"Simple embedded orchestration completed\",\n        status=summary[\"status\"],\n        child_executed=child_executed,\n        child_status=child_status,\n        response_length=len(summary[\"response\"]),\n        tokens_in=tokens_in,\n        tokens_out=tokens_out,\n    )\n\n    # Raising is the route these samples use to mark the run FAILED -- EndOutput.failed is honoured end-to-end but is not used by these samples yet. Keep the payload under the 4000-char\n    # error_message truncation.\n    if summary[\"status\"] != \"success\":\n        raise RuntimeError(\"ORCH_FAILED \" + json.dumps(summary, default=str)[:3500])\n\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data={\n            \"status\": summary[\"status\"],\n            \"child_executed\": summary[\"child_executed\"],\n            \"child_status\": summary[\"child_status\"],\n            \"response\": summary[\"response\"],\n            \"tokens_in\": summary[\"tokens_in\"],\n            \"tokens_out\": summary[\"tokens_out\"],\n            \"model\": summary[\"model\"],\n            \"provider\": summary[\"provider\"],\n        },\n    )\n",
+   "manifest_yaml": "name: EmbeddedEnd\ndescription: |\n  End component for the Simple embedded orchestration.\n  Returns the embedded child orchestration's result and asserts that the child\n  actually executed rather than being silently skipped.\n\nextension_type: end\n\nuse_cases:\n  - Returning a nested orchestration's result from the parent\n  - Asserting that an embedded child orchestration really executed\n  - Integration-testing the nested-orchestration execution path\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # The embedding node's port is derived from the child orchestration: its\n    # artifact_type_output is the child END in-port's artifact_type_input, which\n    # is `json` for the Simple ChatGPT agent. This script reads only\n    # `input.response_data` and returns `artifact=None`, so an arriving json\n    # artifact is tolerated and never required.\n    artifact_type_input: optional(json)\n    request_data:\n      status: string (optional) - The child orchestration's own status field\n      response: string (optional) - The model reply produced inside the child\n      tokens_in: integer (optional) - Prompt tokens consumed by the child\n      tokens_out: integer (optional) - Completion tokens produced by the child\n      model: string (optional) - Model resolved inside the child\n      provider: string (optional) - Provider resolved inside the child\n\nexternal_out_port:\n  port_name: result\n  artifact_type_output: none\n  response_data:\n    status: string - success or failed\n    child_executed: boolean - True only if the embedded child produced real output\n    child_status: string - The child orchestration's own reported status\n    response: string - The model reply produced inside the child\n    tokens_in: integer - Prompt tokens consumed by the child\n    tokens_out: integer - Completion tokens produced by the child\n    model: string - Model resolved inside the child\n    provider: string - Provider resolved inside the child\n\nsample_test_input:\n  request_data:\n    status: success\n    response: A nested orchestration lets you reuse a whole pipeline as one node.\n    tokens_in: 30\n    tokens_out: 64\n    model: gpt-4o\n    provider: openai\n\nnotes: |\n  Pipeline flow: START -> Simple ChatGPT agent (embedded) -> [END]\n\n  All input fields are declared OPTIONAL on purpose. The hop from the embedded\n  orchestration node to this END is a PHANTOM mainflow hop\n  (config.mainflow_target_node_ref), not an explicit edge, so it carries no\n  edge contract -- and marking the fields required here would make the\n  component contract claim a guarantee the graph does not enforce.\n\n  The assertion is therefore made in the SCRIPT, not the contract:\n  child_executed requires a non-empty response AND tokens_out > 0. If the\n  embedded orchestration were skipped, those fields would be absent and this\n  component RAISES, marking the run FAILED.\n\n  MODE-AGNOSTIC ON PURPOSE. The assertion deliberately does NOT require\n  child_status == \"success\". `status` is emitted by the CHILD's END component,\n  which exists only in subprocess mode: inline execution flattens the child\n  into the parent and removes the child's START/END entirely, so a perfectly\n  healthy inline run reports child_status \"not_reported\". Asserting on it would\n  fail every inline run. Model output plus real completion tokens proves\n  execution in both modes.\n\n  FAILURE SEMANTICS: EndOutput.failed is honoured end-to-end but is not used by these samples yet, so failure is signalled by\n  raising RuntimeError with an \"ORCH_FAILED \" prefix and the JSON summary.\n",
+   "ports": [
+    {
+     "direction": "IN",
+     "key": "input",
+     "label": "Input",
+     "port_type": "in",
+     "contract": {},
+     "tool_call": false,
+     "post_tool_contract": null,
+     "base_schema": null,
+     "artifact_type_constraint": null,
+     "allowed_states": null,
+     "request_data_schema": {
+      "status": {
+       "type": "string",
+       "required": false,
+       "description": "The child orchestration's own status field"
+      },
+      "response": {
+       "type": "string",
+       "required": false,
+       "description": "The model reply produced inside the child"
+      },
+      "tokens_in": {
+       "type": "integer",
+       "required": false,
+       "description": "Prompt tokens consumed by the child"
+      },
+      "tokens_out": {
+       "type": "integer",
+       "required": false,
+       "description": "Completion tokens produced by the child"
+      },
+      "model": {
+       "type": "string",
+       "required": false,
+       "description": "Model resolved inside the child"
+      },
+      "provider": {
+       "type": "string",
+       "required": false,
+       "description": "Provider resolved inside the child"
+      }
+     },
+     "response_data_schema": null,
+     "artifact_type_input": "optional(json)",
+     "artifact_type_output": null,
+     "artifact_input_schema": null,
+     "artifact_output_schema": null,
+     "multi_artifact": false,
+     "artifact_types": [
+      "none"
+     ]
+    },
+    {
+     "direction": "OUT",
+     "key": "result",
+     "label": "Result",
+     "port_type": "external_out",
+     "contract": {},
+     "tool_call": false,
+     "post_tool_contract": null,
+     "base_schema": null,
+     "artifact_type_constraint": null,
+     "allowed_states": null,
+     "request_data_schema": null,
+     "response_data_schema": {
+      "status": {
+       "type": "string",
+       "required": true
+      },
+      "child_executed": {
+       "type": "boolean",
+       "required": true
+      },
+      "child_status": {
+       "type": "string",
+       "required": true
+      },
+      "response": {
+       "type": "string",
+       "required": true
+      },
+      "tokens_in": {
+       "type": "integer",
+       "required": true
+      },
+      "tokens_out": {
+       "type": "integer",
+       "required": true
+      },
+      "model": {
+       "type": "string",
+       "required": true
+      },
+      "provider": {
+       "type": "string",
+       "required": true
+      }
+     },
+     "artifact_type_input": null,
+     "artifact_type_output": "none",
+     "artifact_input_schema": null,
+     "artifact_output_schema": null,
+     "multi_artifact": false,
+     "artifact_types": [
+      "none"
+     ]
+    }
+   ],
+   "fsm_states": [],
+   "is_template_clone": false,
+   "template_source_id": null,
+   "is_prebuilt_reference": false,
+   "prebuilt_asset_id": null
+  }
+ },
+ "nodes": [
+  {
+   "local_id": "node_0",
+   "name": "START",
+   "component_ref": "c_start",
+   "component_asset_id": null,
+   "config": {},
+   "position": {
+    "x": 100,
+    "y": 200
+   }
+  },
+  {
+   "local_id": "node_1",
+   "name": "Simple ChatGPT agent",
+   "component_ref": "orch_0",
+   "orchestration_ref": "orch_0",
+   "component_asset_id": null,
+   "config": {
+    "execution_mode": "subprocess",
+    "mainflow_target_node_ref": "node_2"
+   },
+   "position": {
+    "x": 400,
+    "y": 200
+   }
+  },
+  {
+   "local_id": "node_2",
+   "name": "END",
+   "component_ref": "c_end",
+   "component_asset_id": null,
+   "config": {},
+   "position": {
+    "x": 700,
+    "y": 200
+   }
+  }
+ ],
+ "ports": [
+  {
+   "node_ref": "node_0",
+   "component_port_key": "output",
+   "component_port_direction": "OUT",
+   "alias": null,
+   "effective_contract": null
+  },
+  {
+   "node_ref": "node_1",
+   "component_port_key": "orchestration",
+   "component_port_direction": "IN",
+   "alias": null,
+   "effective_contract": null
+  },
+  {
+   "node_ref": "node_0",
+   "component_port_key": "trigger",
+   "component_port_direction": "IN",
+   "alias": null,
+   "effective_contract": null
+  },
+  {
+   "node_ref": "node_2",
+   "component_port_key": "input",
+   "component_port_direction": "IN",
+   "alias": null,
+   "effective_contract": null
+  },
+  {
+   "node_ref": "node_2",
+   "component_port_key": "result",
+   "component_port_direction": "OUT",
+   "alias": null,
+   "effective_contract": null
+  }
+ ],
+ "edges": [
+  {
+   "source_port_index": 0,
+   "target_port_index": 1,
+   "edge_kind": "MAINFLOW"
+  }
+ ],
+ "secrets_required": [],
+ "orchestrations": {
+  "orch_0": {
+   "export_version": "1.0",
+   "export_type": "orchestration",
+   "exported_at": "2026-07-19T00:00:00Z",
+   "orchestration": {
+    "name": "Simple ChatGPT agent",
+    "description": "Accepts a prompt and a response-length budget, calls OpenAI through the LLM Request template component, and returns the reply with its token accounting. Built entirely from template components -- no custom code on the agent node.",
+    "runtime_config": {
+     "cpu_request": "500m",
+     "cpu_limit": "1000m",
+     "memory_request": "512Mi",
+     "memory_limit": "2Gi",
+     "gpu_limit": "0"
+    }
+   },
+   "components": {
+    "c_start": {
+     "asset_id": null,
+     "name": "Chat Start",
+     "category": "START",
+     "description": "Start component for the Simple ChatGPT agent. Validates the incoming prompt and response-length budget and passes them to the LLM Request node.",
+     "short_description": "Validate the chat request and fan the parameters out downstream.",
+     "tags": [
+      "sample",
+      "chat",
+      "start"
+     ],
+     "config": {
+      "port_order": [
+       "external_input",
+       "output"
+      ],
+      "is_generic_start": true,
+      "input_parameters": {
+       "values": {
+        "prompt": "Explain what a vector database is in two sentences.",
+        "max_length": 300
+       },
+       "declarations": [
+        {
+         "name": "prompt",
+         "type": "text_long",
+         "label": "Prompt",
+         "required": true,
+         "_schema_type": "string",
+         "description": "The user prompt to send to the model."
+        },
+        {
+         "name": "max_length",
+         "type": "number",
+         "label": "Max Length",
+         "required": false,
+         "default": 1000,
+         "_schema_type": "integer",
+         "description": "Soft response-length budget in tokens."
+        }
+       ]
+      }
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "import perceivo\n\n\n@perceivo.start\nasync def chat_start(input: perceivo.primitives.StartInput) -> perceivo.primitives.StartOutput:\n    \"\"\"Validate the chat request and fan the parameters out downstream.\"\"\"\n    request_data = input.request_data or {}\n\n    prompt = request_data.get(\"prompt\")\n    if not isinstance(prompt, str) or not prompt.strip():\n        raise ValueError(\"prompt is required and must be a non-empty string\")\n    prompt = prompt.strip()\n\n    # max_length is optional. Reject bool explicitly: bool is a subclass of int\n    # in Python, so `isinstance(True, int)` is True and True would become 1.\n    max_length = request_data.get(\"max_length\")\n    if isinstance(max_length, bool) or not isinstance(max_length, (int, float)):\n        max_length = 1000\n    max_length = int(max_length)\n    if max_length < 1:\n        raise ValueError(f\"max_length must be positive, got {max_length}\")\n\n    perceivo.log.info(\n        \"Simple ChatGPT agent started\",\n        prompt_length=len(prompt),\n        max_length=max_length,\n    )\n\n    payload = {\n        \"prompt\": prompt,\n        \"max_length\": max_length,\n    }\n\n    # The LLM Request template declares a `json` input artifact, so START emits\n    # one. Its own ${prompt} reference resolves from response_data; the artifact\n    # is the declared-type carrier that makes the START -> LLM edge type-check.\n    return perceivo.primitives.StartOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=payload,\n            mime_type=\"application/json\",\n        ),\n        response_data={\n            \"prompt\": payload[\"prompt\"],\n            \"max_length\": payload[\"max_length\"],\n        },\n    )\n",
+     "manifest_yaml": "name: ChatStart\ndescription: |\n  Start component for the Simple ChatGPT agent orchestration.\n  Validates the incoming chat request (prompt, max_length) and passes the\n  parameters to the LLM Request node.\n\nextension_type: start\n\nuse_cases:\n  - Accepting a free-text prompt from a caller and routing it to an LLM\n  - Enforcing a response-length budget on a single-turn chat request\n  - Front door for a no-code, template-only LLM orchestration\n\nexternal_in_port:\n  port_name: trigger\n  request_data:\n    prompt: string - The user prompt to send to the model\n    max_length: number (optional) - Soft response-length budget in tokens (default 1000)\n\noutput_ports:\n  - port_name: output\n    port_type: out\n    artifact_type_output: json\n    response_data:\n      prompt: string - The validated, whitespace-trimmed user prompt\n      max_length: number - The resolved response-length budget\n\nsample_test_input:\n  request_data:\n    prompt: Explain what a vector database is in two sentences.\n    max_length: 300\n\nnotes: |\n  Pipeline flow: [START] -> LLM Request -> END\n\n  Required parameters:\n  - prompt: non-empty string; the component raises if it is missing or blank\n\n  Optional parameters with defaults:\n  - max_length: 1000 tokens\n\n  max_length is a SOFT budget. It is interpolated into the LLM Request node's\n  system prompt (`${max_length}`) to steer the model, and is deliberately not\n  the hard `max_tokens` cap -- node input parameters other than the two prompt\n  fields are not ${...}-interpolated by the LLM Request template.\n\n  No artifact travels this hop; data moves only through response_data.\n\ninput_prompt: >\n  Enter the prompt you want to send to the model, and optionally a response\n  length budget in tokens.\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "trigger",
+       "label": "Trigger",
+       "port_type": "external_in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "prompt": {
+         "type": "string",
+         "description": "The user prompt to send to the model",
+         "required": true
+        },
+        "max_length": {
+         "type": "integer",
+         "description": "Soft response-length budget in tokens",
+         "required": false
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": null,
+       "artifact_type_output": "none",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": [
+        "none"
+       ]
+      },
+      {
+       "direction": "OUT",
+       "key": "output",
+       "label": "Output",
+       "port_type": "out",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": {
+        "prompt": {
+         "type": "string",
+         "description": "The validated user prompt",
+         "required": true
+        },
+        "max_length": {
+         "type": "integer",
+         "description": "The resolved response-length budget",
+         "required": true
+        }
+       },
+       "artifact_type_input": null,
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": [
+        "json"
+       ]
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    },
+    "c_llm": {
+     "asset_id": null,
+     "name": "LLM Request",
+     "category": "AGENT",
+     "description": "Call a platform-managed AI Foundry model or a bring-your-own-key provider (Claude, GPT, Gemini) and return the response as JSON. Records token cost on the run.",
+     "short_description": "Call a platform-managed AI Foundry model or a bring-your-own-key provider (Claude, GPT, Gemini) and return the response as JSON. Records token cost on the run.",
+     "tags": [
+      "template",
+      "llm",
+      "agent"
+     ],
+     "config": {
+      "port_order": [
+       "input",
+       "output"
+      ],
+      "port_sides": {
+       "input": "left",
+       "output": "right"
+      },
+      "input_parameters": {
+       "values": {
+        "provider": "managed",
+        "model": "gpt-5.2 ($1.25/$10 per 1M)",
+        "user_prompt": "${prompt}",
+        "system_prompt": "You are a helpful assistant.",
+        "temperature": 0.7,
+        "max_tokens": 4000,
+        "reasoning_effort": ""
+       },
+       "declarations": [
+        {
+         "name": "provider",
+         "type": "select",
+         "label": "LLM Provider",
+         "required": true,
+         "default": "managed",
+         "options": [
+          "anthropic",
+          "google",
+          "managed",
+          "openai"
+         ]
+        },
+        {
+         "name": "model",
+         "type": "select",
+         "label": "Model",
+         "required": true,
+         "default": "gpt-5.2 ($1.25/$10 per 1M)",
+         "depends_on": {
+          "parameter": "provider",
+          "options_map": {
+           "anthropic": [
+            "claude-sonnet-4-5-20250929 ($3/$15 per 1M)",
+            "claude-opus-4-20250514 ($15/$75 per 1M)",
+            "claude-sonnet-4-5-20250514 ($3/$15 per 1M)",
+            "claude-haiku-4-5-20251001 ($0.8/$4 per 1M)"
+           ],
+           "openai": [
+            "o3 ($2/$8 per 1M)",
+            "gpt-4o ($2.5/$10 per 1M)",
+            "gpt-4o-mini ($0.15/$0.6 per 1M)",
+            "gpt-4-turbo ($10/$30 per 1M)",
+            "o1 ($15/$60 per 1M)",
+            "o3-mini ($1.1/$4.4 per 1M)"
+           ],
+           "google": [
+            "gemini-2.0-flash ($0.1/$0.4 per 1M)",
+            "gemini-1.5-pro ($1.25/$5 per 1M)",
+            "gemini-1.5-flash ($0.075/$0.3 per 1M)"
+           ],
+           "managed": [
+            "gpt-5.2 ($1.25/$10 per 1M)",
+            "gpt-5-nano ($0.05/$0.4 per 1M)",
+            "o4-mini ($1.1/$4.4 per 1M)",
+            "grok-4-1-fast-reasoning ($0.2/$0.5 per 1M)"
+           ]
+          }
+         }
+        },
+        {
+         "name": "user_prompt",
+         "type": "text_long",
+         "label": "User Prompt",
+         "required": false,
+         "default": "${prompt}",
+         "description": "Prompt sent to the model. Use ${variable} or ${nested.path} to reference request_data values."
+        },
+        {
+         "name": "system_prompt",
+         "type": "text_long",
+         "label": "System Prompt",
+         "required": true,
+         "default": "You are a helpful assistant.",
+         "description": "Instructions for the model. Describe what this agent should do."
+        },
+        {
+         "name": "temperature",
+         "type": "number",
+         "label": "Temperature",
+         "default": 0.7,
+         "constraints": {
+          "min": 0,
+          "max": 2,
+          "step": 0.1
+         },
+         "description": "Lower = more deterministic. Higher = more creative."
+        },
+        {
+         "name": "max_tokens",
+         "type": "integer",
+         "label": "Max Tokens",
+         "default": 4000,
+         "constraints": {
+          "min": 100,
+          "max": 100000
+         },
+         "description": "Maximum length of the model's response."
+        },
+        {
+         "name": "reasoning_effort",
+         "type": "select",
+         "label": "Reasoning Effort",
+         "default": "",
+         "options": [
+          "low",
+          "medium",
+          "high"
+         ],
+         "description": "Managed reasoning deployments (o4-mini, the *-reasoning variants) only. Hidden reasoning tokens are billed as completion tokens against Max Tokens, so a high effort with a small budget returns an empty answer. Leave blank to let the deployment choose."
+        }
+       ]
+      },
+      "required_secrets": [
+       {
+        "name": "api_key",
+        "label": "API Key",
+        "required": false,
+        "description": "Provider API key. Required for anthropic/openai/google; unused for the managed provider."
+       }
+      ],
+      "detected_endpoints": [
+       {
+        "host": null,
+        "library": "httpx",
+        "category": "http_client",
+        "confidence": "detected",
+        "description": "HTTP client (httpx)"
+       },
+       {
+        "host": "api.anthropic.com",
+        "library": "url_literal",
+        "category": "http_client",
+        "confidence": "detected",
+        "description": "HTTP endpoint: api.anthropic.com"
+       },
+       {
+        "host": "api.openai.com",
+        "library": "url_literal",
+        "category": "http_client",
+        "confidence": "detected",
+        "description": "HTTP endpoint: api.openai.com"
+       },
+       {
+        "host": "generativelanguage.googleapis.com",
+        "library": "url_literal",
+        "category": "http_client",
+        "confidence": "detected",
+        "description": "HTTP endpoint: generativelanguage.googleapis.com"
+       }
+      ]
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": "json",
+     "artifact_type_output": "json",
+     "script": "import perceivo\nimport httpx\nimport json\nimport re\n\n# Bring-your-own-key provider endpoints. Managed models skip these entirely and\n# route through perceivo.managed_service.ai.invoke, which authenticates\n# server-side.\n_ANTHROPIC_URL = \"https://api.anthropic.com/v1/messages\"\n_OPENAI_URL = \"https://api.openai.com/v1/chat/completions\"\n_GOOGLE_URL = \"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent\"\n\n\ndef _lookup_nested_value(data: dict, dotted_key: str):\n    \"\"\"Resolve a dotted key such as 'state_1.response' against a nested dict.\"\"\"\n    value = data\n    for part in dotted_key.split(\".\"):\n        if isinstance(value, dict) and part in value:\n            value = value[part]\n        else:\n            return None\n    return value\n\n\ndef _resolve_field(template, data: dict):\n    \"\"\"Resolve a configured field against request_data.\n\n    A bare \"${dotted.key}\" returns the referenced value (which may be a dict).\n    Text with one or more embedded ${...} references has each replaced inline.\n    Plain text is returned unchanged.\n    \"\"\"\n    template = str(template or \"\").strip()\n    if not template:\n        return None\n    bare = re.fullmatch(r\"\\$\\{([\\w.]+)\\}\", template)\n    if bare:\n        return _lookup_nested_value(data, bare.group(1))\n    if \"${\" in template:\n        def replace(match):\n            resolved = _lookup_nested_value(data, match.group(1))\n            return str(resolved) if resolved is not None else match.group(0)\n        return re.sub(r\"\\$\\{([\\w.]+)\\}\", replace, template)\n    return template\n\n\ndef _empty_completion_error(model, system_prompt, finish_reason, tokens_out,\n                            max_tokens, reasoning_effort):\n    \"\"\"Build the failure message for a 200 OK completion that carried no text.\n\n    A component script cannot read its own node's name -- the runtime hands it\n    node configuration, not node identity -- so the node is named by the two\n    things it can prove: the model this node is pinned to, and the opening of\n    this node's own System Prompt. A parallel branch adds its branch label on\n    top of that, because the parallel executor keys branch errors by label.\n    \"\"\"\n    role = \" \".join(str(system_prompt or \"\").split())[:120]\n    if finish_reason == \"length\":\n        cause = (\n            \"the model reached its token cap before emitting a single visible \"\n            \"character. On a reasoning deployment (o4-mini, the *-reasoning \"\n            \"variants) hidden reasoning tokens are billed as completion tokens, \"\n            \"so they can consume the whole Max Tokens budget\"\n        )\n    else:\n        cause = \"the provider returned a successful response with no content\"\n    return (\n        f\"Empty completion from managed model '{model}' \"\n        f\"[node role: {role}]: {cause}. \"\n        f\"finish_reason={finish_reason or 'unset'}, \"\n        f\"completion_tokens={tokens_out}, max_tokens={max_tokens}, \"\n        f\"reasoning_effort={reasoning_effort or 'unset'}. \"\n        f\"Raise Max Tokens, lower Reasoning Effort (low|medium|high), or pin a \"\n        f\"non-reasoning model on this node.\"\n    )\n\n\nasync def _call_managed(model, system_prompt, user_message, temperature, max_tokens,\n                        reasoning_effort=None):\n    \"\"\"Call a platform-managed AI Foundry model (auth handled server-side).\n\n    reasoning_effort is sent only when the node sets it: it is meaningful to\n    reasoning deployments and the platform never picks a value on a node's\n    behalf. finish_reason is returned so the caller can tell an empty answer\n    apart from a truncated one.\n    \"\"\"\n    invoke_kwargs = {\n        \"model\": model,\n        \"messages\": [{\"role\": \"user\", \"content\": user_message}],\n        \"system_prompt\": system_prompt,\n        \"temperature\": temperature,\n        \"max_tokens\": max_tokens,\n    }\n    if reasoning_effort:\n        invoke_kwargs[\"reasoning_effort\"] = reasoning_effort\n\n    response = await perceivo.managed_service.ai.invoke(\n        perceivo.managed_service.ai.AIService.CHAT, **invoke_kwargs\n    )\n\n    choice = (response.get(\"choices\") or [{}])[0] or {}\n    usage = response.get(\"usage\", {})\n    return {\n        \"text\": (choice.get(\"message\") or {}).get(\"content\") or \"\",\n        \"tokens_in\": usage.get(\"prompt_tokens\", 0),\n        \"tokens_out\": usage.get(\"completion_tokens\", 0),\n        \"finish_reason\": choice.get(\"finish_reason\") or \"\",\n    }\n\n\nasync def _call_anthropic(api_key, model, system_prompt, user_message, temperature, max_tokens):\n    \"\"\"Call the Anthropic Messages API with a caller-supplied key.\"\"\"\n    async with httpx.AsyncClient(timeout=120.0) as client:\n        resp = await client.post(\n            _ANTHROPIC_URL,\n            headers={\n                \"x-api-key\": api_key,\n                \"anthropic-version\": \"2023-06-01\",\n                \"content-type\": \"application/json\",\n            },\n            json={\n                \"model\": model,\n                \"max_tokens\": max_tokens,\n                \"temperature\": temperature,\n                \"system\": system_prompt,\n                \"messages\": [{\"role\": \"user\", \"content\": user_message}],\n            },\n        )\n    if resp.status_code != 200:\n        raise RuntimeError(f\"Anthropic API error {resp.status_code}: {resp.text[:500]}\")\n    result = resp.json()\n    usage = result.get(\"usage\", {})\n    return {\n        \"text\": result[\"content\"][0][\"text\"],\n        \"tokens_in\": usage.get(\"input_tokens\", 0),\n        \"tokens_out\": usage.get(\"output_tokens\", 0),\n    }\n\n\nasync def _call_openai(api_key, model, system_prompt, user_message, temperature, max_tokens):\n    \"\"\"Call the OpenAI Chat Completions API with a caller-supplied key.\"\"\"\n    async with httpx.AsyncClient(timeout=120.0) as client:\n        resp = await client.post(\n            _OPENAI_URL,\n            headers={\n                \"Authorization\": f\"Bearer {api_key}\",\n                \"content-type\": \"application/json\",\n            },\n            json={\n                \"model\": model,\n                \"max_tokens\": max_tokens,\n                \"temperature\": temperature,\n                \"messages\": [\n                    {\"role\": \"system\", \"content\": system_prompt},\n                    {\"role\": \"user\", \"content\": user_message},\n                ],\n            },\n        )\n    if resp.status_code != 200:\n        raise RuntimeError(f\"OpenAI API error {resp.status_code}: {resp.text[:500]}\")\n    result = resp.json()\n    usage = result.get(\"usage\", {})\n    return {\n        \"text\": result[\"choices\"][0][\"message\"][\"content\"],\n        \"tokens_in\": usage.get(\"prompt_tokens\", 0),\n        \"tokens_out\": usage.get(\"completion_tokens\", 0),\n    }\n\n\nasync def _call_google(api_key, model, system_prompt, user_message, temperature, max_tokens):\n    \"\"\"Call the Google Gemini generateContent API with a caller-supplied key.\"\"\"\n    async with httpx.AsyncClient(timeout=120.0) as client:\n        resp = await client.post(\n            _GOOGLE_URL.format(model=model),\n            headers={\"content-type\": \"application/json\"},\n            params={\"key\": api_key},\n            json={\n                \"contents\": [{\"parts\": [{\"text\": user_message}]}],\n                \"systemInstruction\": {\"parts\": [{\"text\": system_prompt}]},\n                \"generationConfig\": {\"temperature\": temperature, \"maxOutputTokens\": max_tokens},\n            },\n        )\n    if resp.status_code != 200:\n        raise RuntimeError(f\"Google API error {resp.status_code}: {resp.text[:500]}\")\n    result = resp.json()\n    usage = result.get(\"usageMetadata\", {})\n    return {\n        \"text\": result[\"candidates\"][0][\"content\"][\"parts\"][0][\"text\"],\n        \"tokens_in\": usage.get(\"promptTokenCount\", 0),\n        \"tokens_out\": usage.get(\"candidatesTokenCount\", 0),\n    }\n\n\nasync def _record_llm_cost(provider, model, tokens_in, tokens_out):\n    \"\"\"Look up per-token pricing and record the call's cost. Never fatal.\"\"\"\n    try:\n        pricing = await perceivo.cost.model_pricing(provider, model)\n        if not pricing:\n            return\n        input_per_1m = float(pricing.get(\"input_price_per_1m_usd\", 0))\n        output_per_1m = float(pricing.get(\"output_price_per_1m_usd\", 0))\n        if input_per_1m <= 0 and output_per_1m <= 0:\n            return\n        cost = (tokens_in / 1_000_000) * input_per_1m + (tokens_out / 1_000_000) * output_per_1m\n        await perceivo.cost.record(\n            label=f\"LLM: {provider}/{model}\",\n            amount=round(cost, 6),\n            metadata={\n                \"cost_type\": \"llm_token\",\n                \"provider\": provider,\n                \"model\": model,\n                \"tokens_in\": tokens_in,\n                \"tokens_out\": tokens_out,\n            },\n        )\n    except Exception:\n        pass  # Cost recording is best-effort; never fail the LLM call over it.\n\n\n@perceivo.agent\nasync def llm_request(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Call a managed AI Foundry model or a bring-your-own-key provider.\n\n    Provider, model, prompts, and sampling settings are configured on the node.\n    The user prompt may reference incoming request_data via ${dotted.key}; when\n    it resolves to nothing the agent falls back to the input artifact, then to\n    the full request_data payload. The reply is returned as a JSON artifact and\n    the token cost is recorded on the run.\n    \"\"\"\n    request_data = input.request_data or {}\n\n    provider = str(perceivo.params.get(\"provider\", \"managed\"))\n    # Model names may carry a pricing annotation, e.g. \"gpt-4o ($2.5/$10 per 1M)\".\n    model = str(perceivo.params.get(\"model\", \"gpt-5.2\")).split(\" (\")[0].strip()\n    temperature = float(perceivo.params.get(\"temperature\", 0.7))\n    max_tokens = int(perceivo.params.get(\"max_tokens\", 4000))\n    # Managed reasoning deployments only; blank means \"do not send the key\".\n    reasoning_effort = str(perceivo.params.get(\"reasoning_effort\", \"\") or \"\").strip()\n\n    system_prompt = _resolve_field(\n        perceivo.params.get(\"system_prompt\", \"You are a helpful assistant.\"), request_data\n    ) or \"You are a helpful assistant.\"\n\n    user_message = _resolve_field(perceivo.params.get(\"user_prompt\", \"${prompt}\"), request_data)\n    if isinstance(user_message, (dict, list)):\n        user_message = json.dumps(user_message)\n\n    # Fall back to the input artifact, then the whole request payload.\n    if not user_message and input.artifact is not None and input.artifact.data is not None:\n        data = input.artifact.data\n        user_message = data if isinstance(data, str) else json.dumps(data)\n    if not user_message and request_data:\n        user_message = json.dumps(request_data)\n    if not user_message:\n        raise ValueError(\n            \"No input to send to the model. Set a User Prompt or connect an \"\n            f\"upstream node. Available request_data keys: {list(request_data.keys())}\"\n        )\n\n    # Managed models authenticate server-side; every other provider needs a key.\n    api_key = None\n    if provider != \"managed\":\n        api_key = await perceivo.secrets.get(\"api_key\")\n        if not api_key:\n            raise ValueError(\n                f\"No API key bound for provider '{provider}'. Bind an 'api_key' \"\n                f\"secret in the Inspector, or switch to the managed provider.\"\n            )\n\n    perceivo.log.info(\n        \"Calling LLM\",\n        provider=provider,\n        model=model,\n        temperature=temperature,\n        max_tokens=max_tokens,\n        reasoning_effort=reasoning_effort or None,\n        prompt_length=len(user_message),\n    )\n\n    providers = {\n        \"managed\": lambda: _call_managed(\n            model, system_prompt, user_message, temperature, max_tokens, reasoning_effort\n        ),\n        \"anthropic\": lambda: _call_anthropic(api_key, model, system_prompt, user_message, temperature, max_tokens),\n        \"openai\": lambda: _call_openai(api_key, model, system_prompt, user_message, temperature, max_tokens),\n        \"google\": lambda: _call_google(api_key, model, system_prompt, user_message, temperature, max_tokens),\n    }\n    if provider not in providers:\n        raise ValueError(f\"Unknown provider: {provider}\")\n    result = await providers[provider]()\n\n    response_text = result[\"text\"]\n    tokens_in = result[\"tokens_in\"]\n    tokens_out = result[\"tokens_out\"]\n    perceivo.log.info(\n        f\"LLM response: {len(response_text)} chars, {tokens_in} in / {tokens_out} out tokens\"\n    )\n\n    await _record_llm_cost(provider, model, tokens_in, tokens_out)\n\n    # Cost is recorded first: an empty completion still burned the tokens.\n    # A managed reasoning model that spends its whole budget on hidden reasoning\n    # tokens returns HTTP 200 with content \"\" and finish_reason \"length\". Nothing\n    # between the provider and the END node reports that, so without this check\n    # the branch returns an empty string and the run looks complete.\n    if provider == \"managed\" and not response_text.strip():\n        raise RuntimeError(_empty_completion_error(\n            model, system_prompt, result.get(\"finish_reason\", \"\"),\n            tokens_out, max_tokens, reasoning_effort,\n        ))\n\n    role_summary = system_prompt[:150].replace(\"\\n\", \" \").strip()\n    if len(system_prompt) > 150:\n        role_summary += \"...\"\n    response_preview = response_text[:200].replace(\"\\n\", \" \").strip()\n    if len(response_text) > 200:\n        response_preview += \"...\"\n    conversation_log = (\n        f\"[LLM via {provider}/{model}] Role: {role_summary} | \"\n        f\"Processed {len(user_message)} chars of input. \"\n        f\"Response ({len(response_text)} chars): {response_preview}\"\n    )\n\n    payload = {\n        \"response\": response_text,\n        \"tokens_in\": tokens_in,\n        \"tokens_out\": tokens_out,\n        \"model\": model,\n        \"provider\": provider,\n        \"conversation_log\": conversation_log,\n    }\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=payload,\n            mime_type=\"application/json\",\n        ),\n        response_data={\n            \"response\": payload[\"response\"],\n            \"tokens_in\": payload[\"tokens_in\"],\n            \"tokens_out\": payload[\"tokens_out\"],\n            \"model\": payload[\"model\"],\n            \"provider\": payload[\"provider\"],\n            \"conversation_log\": payload[\"conversation_log\"],\n        },\n    )\n",
+     "manifest_yaml": "extension_type: agent\nname: LLM Request\ndescription: Call a platform-managed AI Foundry model or a bring-your-own-key provider (Claude, GPT, Gemini) and return the response as JSON. Records token cost on the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: json\n    artifact_type_output: json\n    response_data:\n      conversation_log: string\n      model: string\n      provider: string\n      response: string\n      tokens_in: integer\n      tokens_out: integer\nrequired_secrets:\n  - name: api_key\n    label: API Key\n    required: false\n\ninput_parameters:\n  - name: provider\n    type: select\n    label: LLM Provider\n    options: [anthropic, google, managed, openai]\n    default: managed\n    required: true\n  - name: model\n    type: select\n    label: Model\n    default: gpt-5.2 ($1.25/$10 per 1M)\n    required: true\n  - name: user_prompt\n    type: text_long\n    label: User Prompt\n    default: ${prompt}\n  - name: system_prompt\n    type: text_long\n    label: System Prompt\n    default: You are a helpful assistant.\n    required: true\n  - name: temperature\n    type: number\n    label: Temperature\n    default: 0.7\n  - name: max_tokens\n    type: integer\n    label: Max Tokens\n    default: 4000\n  - name: reasoning_effort\n    type: select\n    label: Reasoning Effort\n    options: [low, medium, high]\n    default: \"\"\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "input",
+       "label": "Input",
+       "port_type": "in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": "json",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": [
+        "json"
+       ],
+       "response_data_passthrough_except": null
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    },
+    "c_end": {
+     "asset_id": null,
+     "name": "Chat End",
+     "category": "END",
+     "description": "End component for the Simple ChatGPT agent. Returns the model reply and its token accounting as the run result, and fails the run when the model produced no text.",
+     "short_description": "Return the model reply and token accounting as the run result.",
+     "tags": [
+      "sample",
+      "chat",
+      "end"
+     ],
+     "config": {
+      "port_order": [
+       "input",
+       "external_output"
+      ],
+      "is_generic_end": true,
+      "output_parameters": {
+       "values": {},
+       "declarations": [
+        {
+         "name": "status",
+         "type": "text",
+         "label": "status",
+         "required": true,
+         "_schema_type": "string"
+        },
+        {
+         "name": "response",
+         "type": "text",
+         "label": "response",
+         "required": true,
+         "_schema_type": "string"
+        },
+        {
+         "name": "tokens_in",
+         "type": "number",
+         "label": "tokens_in",
+         "required": true,
+         "_schema_type": "integer"
+        },
+        {
+         "name": "tokens_out",
+         "type": "number",
+         "label": "tokens_out",
+         "required": true,
+         "_schema_type": "integer"
+        },
+        {
+         "name": "model",
+         "type": "text",
+         "label": "model",
+         "required": true,
+         "_schema_type": "string"
+        },
+        {
+         "name": "provider",
+         "type": "text",
+         "label": "provider",
+         "required": true,
+         "_schema_type": "string"
+        }
+       ]
+      }
+     },
+     "additional_packages": null,
+     "requires_gpu": false,
+     "artifact_type_input": null,
+     "artifact_type_output": null,
+     "script": "import json\n\nimport perceivo\n\n\n@perceivo.end\nasync def chat_end(input: perceivo.primitives.EndInput) -> perceivo.primitives.EndOutput:\n    \"\"\"Return the model reply plus its token accounting as the run result.\"\"\"\n    rd = input.response_data or {}\n\n    response = rd.get(\"response\")\n    tokens_in = rd.get(\"tokens_in\", 0)\n    tokens_out = rd.get(\"tokens_out\", 0)\n    model = rd.get(\"model\", \"unknown\")\n    provider = rd.get(\"provider\", \"unknown\")\n\n    summary = {\n        \"status\": \"success\" if response else \"failed\",\n        \"response\": response or \"\",\n        \"tokens_in\": tokens_in,\n        \"tokens_out\": tokens_out,\n        \"model\": model,\n        \"provider\": provider,\n    }\n\n    perceivo.log.info(\n        \"Simple ChatGPT agent completed\",\n        status=summary[\"status\"],\n        response_length=len(summary[\"response\"]),\n        tokens_in=tokens_in,\n        tokens_out=tokens_out,\n        model=model,\n        provider=provider,\n    )\n\n    # Raising is the route these samples use to mark the run FAILED -- EndOutput.failed is honoured end-to-end but is not used by these samples yet. Keep the payload under the 4000-char\n    # error_message truncation.\n    if summary[\"status\"] != \"success\":\n        raise RuntimeError(\"ORCH_FAILED \" + json.dumps(summary, default=str)[:3500])\n\n    return perceivo.primitives.EndOutput(\n        artifact=None,\n        response_data={\n            \"status\": summary[\"status\"],\n            \"response\": summary[\"response\"],\n            \"tokens_in\": summary[\"tokens_in\"],\n            \"tokens_out\": summary[\"tokens_out\"],\n            \"model\": summary[\"model\"],\n            \"provider\": summary[\"provider\"],\n        },\n    )\n",
+     "manifest_yaml": "name: ChatEnd\ndescription: |\n  End component for the Simple ChatGPT agent orchestration.\n  Collects the model reply and token accounting from the LLM Request node and\n  returns them as the run result.\n\nextension_type: end\n\nuse_cases:\n  - Returning a single-turn LLM reply as the orchestration result\n  - Surfacing token usage for cost attribution on a run\n  - Failing a run explicitly when the model produced no text\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: json\n    request_data:\n      response: string - The model reply text\n      tokens_in: integer (optional) - Prompt tokens consumed\n      tokens_out: integer (optional) - Completion tokens produced\n      model: string (optional) - Resolved model name\n      provider: string (optional) - Resolved provider name\n\nexternal_out_port:\n  port_name: result\n  artifact_type_output: none\n  response_data:\n    status: string - success or failed\n    response: string - The model reply text\n    tokens_in: integer - Prompt tokens consumed\n    tokens_out: integer - Completion tokens produced\n    model: string - Resolved model name\n    provider: string - Resolved provider name\n\nsample_test_input:\n  request_data:\n    response: A vector database stores high-dimensional embeddings and retrieves them by similarity.\n    tokens_in: 24\n    tokens_out: 18\n    model: gpt-4o\n    provider: openai\n\nnotes: |\n  Pipeline flow: START -> LLM Request -> [END]\n\n  The LLM Request template returns a fresh response_data payload (it does not\n  spread its inbound request_data), so what arrives here is exactly the six\n  keys that template emits: response, tokens_in, tokens_out, model, provider,\n  conversation_log. This component reports five of them and drops\n  conversation_log, which is already captured in the node log.\n\n  FAILURE SEMANTICS: EndOutput.failed is honoured end-to-end but is not used by these samples yet. An empty/missing response\n  is therefore reported by RAISING RuntimeError with an \"ORCH_FAILED \" prefix\n  and the JSON summary, which marks the workload FAILED. On success the summary\n  lands at output_payload.response_data.\n\n  No artifact is expected or produced.\n",
+     "ports": [
+      {
+       "direction": "IN",
+       "key": "input",
+       "label": "Input",
+       "port_type": "in",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": {
+        "response": {
+         "type": "string",
+         "description": "The model reply text",
+         "required": true
+        },
+        "tokens_in": {
+         "type": "integer",
+         "description": "Prompt tokens consumed",
+         "required": false
+        },
+        "tokens_out": {
+         "type": "integer",
+         "description": "Completion tokens produced",
+         "required": false
+        },
+        "model": {
+         "type": "string",
+         "description": "Resolved model name",
+         "required": false
+        },
+        "provider": {
+         "type": "string",
+         "description": "Resolved provider name",
+         "required": false
+        }
+       },
+       "response_data_schema": null,
+       "artifact_type_input": "json",
+       "artifact_type_output": null,
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": [
+        "json"
+       ]
+      },
+      {
+       "direction": "OUT",
+       "key": "result",
+       "label": "Result",
+       "port_type": "external_out",
+       "contract": {},
+       "tool_call": false,
+       "post_tool_contract": null,
+       "base_schema": null,
+       "artifact_type_constraint": null,
+       "allowed_states": null,
+       "request_data_schema": null,
+       "response_data_schema": {
+        "status": {
+         "type": "string",
+         "required": false
+        },
+        "response": {
+         "type": "string",
+         "required": false
+        },
+        "tokens_in": {
+         "type": "integer",
+         "required": false
+        },
+        "tokens_out": {
+         "type": "integer",
+         "required": false
+        },
+        "model": {
+         "type": "string",
+         "required": false
+        },
+        "provider": {
+         "type": "string",
+         "required": false
+        }
+       },
+       "artifact_type_input": null,
+       "artifact_type_output": "none",
+       "artifact_input_schema": null,
+       "artifact_output_schema": null,
+       "multi_artifact": false,
+       "artifact_types": [
+        "none"
+       ]
+      }
+     ],
+     "fsm_states": [],
+     "is_template_clone": false,
+     "template_source_id": null,
+     "is_prebuilt_reference": false,
+     "prebuilt_asset_id": null
+    }
+   },
+   "nodes": [
+    {
+     "local_id": "node_0",
+     "name": "START",
+     "component_ref": "c_start",
+     "component_asset_id": null,
+     "config": {},
+     "position": {
+      "x": 100,
+      "y": 200
+     }
+    },
+    {
+     "local_id": "node_1",
+     "name": "LLM Request",
+     "component_ref": "c_llm",
+     "component_asset_id": null,
+     "config": {
+      "input_parameters": {
+       "values": {
+        "provider": "managed",
+        "model": "gpt-5.2 ($1.25/$10 per 1M)",
+        "user_prompt": "${prompt}",
+        "system_prompt": "You are a helpful assistant. Keep your answer under ${max_length} tokens.",
+        "temperature": 0.7,
+        "max_tokens": 1000
+       }
+      },
+      "secret_bindings": {
+       "bindings": {
+        "api_key": null
+       }
+      },
+      "mainflow_target_node_ref": "node_2"
+     },
+     "position": {
+      "x": 400,
+      "y": 200
+     }
+    },
+    {
+     "local_id": "node_2",
+     "name": "END",
+     "component_ref": "c_end",
+     "component_asset_id": null,
+     "config": {},
+     "position": {
+      "x": 700,
+      "y": 200
+     }
+    }
+   ],
+   "ports": [
+    {
+     "node_ref": "node_0",
+     "component_port_key": "trigger",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_0",
+     "component_port_key": "output",
+     "component_port_direction": "OUT",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_1",
+     "component_port_key": "input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_2",
+     "component_port_key": "input",
+     "component_port_direction": "IN",
+     "alias": null,
+     "effective_contract": null
+    },
+    {
+     "node_ref": "node_2",
+     "component_port_key": "result",
+     "component_port_direction": "OUT",
+     "alias": null,
+     "effective_contract": null
+    }
+   ],
+   "edges": [
+    {
+     "source_port_index": 1,
+     "target_port_index": 2,
+     "edge_kind": "MAINFLOW"
+    }
+   ],
+   "secrets_required": [
+    {
+     "alias": "api_key",
+     "hint": "api_key",
+     "node_ref": "node_1"
+    }
+   ]
+  }
+ },
+ "import_as_draft": true
+}

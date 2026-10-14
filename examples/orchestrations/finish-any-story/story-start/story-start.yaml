@@ -1,0 +1,29 @@
+extension_type: START
+name: Story Start
+description: Turns the opening lines you type into the story artifact.
+tags:
+  - beginner
+  - start
+external_in_port:
+  port_name: external_in
+  port_type: external_in
+  artifact_type_input: json
+  artifact_type_output: text
+  request_data:
+    opening:
+      type: string
+      description: The first lines of a story.
+output_ports:
+  - port_name: output
+    port_type: out
+    artifact_type_input: json
+    # The artifact is the work itself: the story, as text.
+    artifact_type_output: text
+    # Response data is small, structured facts about the work.
+    response_data:
+      words_in_opening:
+        type: integer
+        description: How many words the opening has.
+input_parameters: []
+input_prompt: Type the first lines of a story.
+required_secrets: []

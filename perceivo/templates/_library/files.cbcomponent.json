@@ -1,0 +1,131 @@
+{
+  "export_version": "1.0",
+  "export_type": "component",
+  "exported_at": "2026-10-06T00:00:00Z",
+  "component": {
+    "asset_id": null,
+    "name": "FILES (SYSTEM, READ-ONLY)",
+    "category": "AGENT",
+    "description": "What it does Reads, writes, lists and deletes files in your organization's file storage - the same files people see in the Files area of the app - so an orchestration can load its inputs and save what it produces.\n\nHow it works Each node runs one operation, chosen in the Inspector, on a path such as reports/q3.csv. READ_FILE emits the file as a file artifact; READ_DIRECTORY emits each file in a folder, up to 100. WRITE_FILE saves the incoming file, or the Content text when no file arrives, as a new version if the file exists. WRITE_DIRECTORY saves every incoming file into a folder. LIST lists a folder and DELETE moves a file or folder to the trash. The path can be filled from the incoming data with ${field} placeholders. A path that does not exist fails the run - nothing is quietly written to the root instead.\n\nConfigure\n- Operation - READ_FILE, READ_DIRECTORY, WRITE_FILE, WRITE_DIRECTORY, LIST or DELETE.\n- File Path - the file or folder to act on; empty means the root for LIST and the folder operations.\n- Content - the text WRITE_FILE writes when no file arrives.\n\nIn and out In: optional files to write, and any data the placeholders use. Out: the files read, plus the incoming data with the operation, the path, file_count and the files read, written or listed.\n\nUse it when\n- An orchestration starts from a document or spreadsheet someone uploaded.\n- You want to save a generated report, export or image for people to open.\n- A pipeline should process every file in a folder.",
+    "short_description": "Reads, writes, lists and deletes files in your organization's file storage.",
+    "tags": [
+      "template",
+      "storage",
+      "files"
+    ],
+    "config": {
+      "port_order": [
+        "input"
+      ],
+      "port_sides": {
+        "input": "left"
+      },
+      "input_parameters": {
+        "values": {
+          "operation": "READ_FILE",
+          "path": "${file_path}",
+          "content": ""
+        },
+        "declarations": [
+          {
+            "name": "operation",
+            "type": "select",
+            "label": "Operation",
+            "options": [
+              "READ_FILE",
+              "READ_DIRECTORY",
+              "WRITE_FILE",
+              "WRITE_DIRECTORY",
+              "LIST",
+              "DELETE"
+            ],
+            "default": "READ_FILE",
+            "required": true,
+            "description": "The file operation this node runs."
+          },
+          {
+            "name": "path",
+            "type": "text",
+            "label": "File Path",
+            "default": "${file_path}",
+            "description": "The path from the root of the organization's files, such as reports/q3.csv. A folder for READ_DIRECTORY, WRITE_DIRECTORY and LIST, where empty means the root. Accepts ${field} placeholders."
+          },
+          {
+            "name": "content",
+            "type": "text_long",
+            "label": "Content",
+            "default": "",
+            "description": "The text WRITE_FILE writes when no file arrives. Accepts ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "WRITE_FILE"
+              ]
+            }
+          }
+        ]
+      },
+      "icon": {
+        "type": "lucide",
+        "value": "folder"
+      }
+    },
+    "additional_packages": null,
+    "requires_gpu": false,
+    "artifact_type_input": "optional(file)",
+    "artifact_type_output": "optional(file)",
+    "script": "\"\"\"Files -- read, write, list and delete files in the organization's file storage.\n\nOne node runs one operation, chosen in the Inspector: READ_FILE,\nREAD_DIRECTORY, WRITE_FILE, WRITE_DIRECTORY, LIST or DELETE. The path is a\nslash-separated path from the root of the organization's files\n(\"reports/q3.csv\") and may contain ${field} placeholders, filled from the\nincoming request_data.\n\nA misconfigured node raises ValueError before storage is touched, and a path\nthat does not exist raises FileNotFoundError. Nothing is written anywhere the\npath did not name: a missing folder fails the run instead of falling back to\nthe root.\n\"\"\"\n\nimport json\nimport re\n\nimport perceivo\n\n_OPERATIONS = (\"READ_FILE\", \"READ_DIRECTORY\", \"WRITE_FILE\", \"WRITE_DIRECTORY\", \"LIST\", \"DELETE\")\n_MAX_FILES_PER_DIRECTORY = 100\n_PLACEHOLDER = re.compile(r\"\\$\\{([\\w.]+)\\}\")\n_MIME_TYPES = {\n    \"txt\": \"text/plain\",\n    \"md\": \"text/markdown\",\n    \"csv\": \"text/csv\",\n    \"json\": \"application/json\",\n    \"html\": \"text/html\",\n    \"xml\": \"application/xml\",\n    \"yaml\": \"application/yaml\",\n    \"yml\": \"application/yaml\",\n    \"pdf\": \"application/pdf\",\n    \"png\": \"image/png\",\n    \"jpg\": \"image/jpeg\",\n    \"jpeg\": \"image/jpeg\",\n    \"gif\": \"image/gif\",\n    \"svg\": \"image/svg+xml\",\n    \"zip\": \"application/zip\",\n}\n\n\ndef _lookup(data, path: str):\n    \"\"\"Return (True, value) for a dotted path into data, or (False, None).\"\"\"\n    value = data\n    for part in path.split(\".\"):\n        if isinstance(value, dict) and part in value:\n            value = value[part]\n        elif isinstance(value, list) and part.isdigit() and int(part) < len(value):\n            value = value[int(part)]\n        else:\n            return False, None\n    return True, value\n\n\ndef _fill(label: str, template: str, data: dict) -> str:\n    \"\"\"Replace each ${path} in template with that value from data, raising on a missing field.\"\"\"\n\n    def _replace(match):\n        found, value = _lookup(data, match.group(1))\n        if not found:\n            raise ValueError(\n                f\"{label} refers to ${{{match.group(1)}}}, but the incoming data has no such field.\"\n            )\n        return value if isinstance(value, str) else json.dumps(value)\n\n    return _PLACEHOLDER.sub(_replace, template)\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    value = perceivo.params.get(name, default)\n    return default if value is None else str(value)\n\n\ndef _segments(path: str) -> list:\n    \"\"\"The folder and file names along path; '.' and '..' are refused.\"\"\"\n    parts = [part.strip() for part in path.replace(\"\\\\\", \"/\").split(\"/\") if part.strip()]\n    for part in parts:\n        if part in (\".\", \"..\"):\n            raise ValueError(f\"File Path {path!r} uses {part!r}. Give the path from the root of the files.\")\n    return parts\n\n\ndef _mime_for(name: str) -> str:\n    extension = name.rsplit(\".\", 1)[-1].lower() if \".\" in name else \"\"\n    return _MIME_TYPES.get(extension, \"application/octet-stream\")\n\n\ndef _listing(entry) -> dict:\n    return {\"id\": entry.id, \"name\": entry.name, \"type\": entry.entry_type, \"size\": entry.size_bytes}\n\n\nasync def _child(parent_id, name: str):\n    \"\"\"The entry called name directly inside parent_id (None = the root), or None.\"\"\"\n    for entry in await perceivo.files.list(parent_id=parent_id):\n        if entry.name == name:\n            return entry\n    return None\n\n\nasync def _resolve(segments: list):\n    \"\"\"The entry at segments, or None when any part of the path is missing.\"\"\"\n    entry = None\n    for name in segments:\n        if entry is not None and entry.entry_type != \"folder\":\n            return None\n        entry = await _child(entry.id if entry else None, name)\n        if entry is None:\n            return None\n    return entry\n\n\nasync def _folder(segments: list, path: str):\n    \"\"\"The id of the folder at segments (None for the root); raises when it is missing or a file.\"\"\"\n    if not segments:\n        return None\n    entry = await _resolve(segments)\n    if entry is None:\n        raise FileNotFoundError(f\"No folder at {path!r} in the organization's files.\")\n    if entry.entry_type != \"folder\":\n        raise NotADirectoryError(f\"{path!r} is a file, not a folder.\")\n    return entry.id\n\n\nasync def _read(entry):\n    return perceivo.primitives.Artifact(\n        type=perceivo.primitives.ArtifactType.FILE,\n        data=await perceivo.files.read(entry.id),\n        mime_type=entry.mime_type or _mime_for(entry.name),\n        file_name=entry.name,\n    )\n\n\ndef _artifact_name(key: str, artifact) -> str:\n    \"\"\"The file name an incoming artifact is written under: its own, else its key.\"\"\"\n    if artifact.file_name:\n        return artifact.file_name\n    return \"file.bin\" if key == \"main\" else key\n\n\ndef _content_of(artifact):\n    if isinstance(artifact.data, (bytes, str)):\n        return artifact.data\n    return json.dumps(artifact.data)\n\n\nasync def _write(name: str, content, folder_id, mime_type: str) -> dict:\n    written = await perceivo.files.write(name, content, parent_id=folder_id, mime_type=mime_type)\n    entry = written.get(\"entry\") or {}\n    return {\"id\": entry.get(\"id\"), \"name\": entry.get(\"name\", name), \"type\": \"file\", \"size\": entry.get(\"size_bytes\")}\n\n\n@perceivo.agent\nasync def files_agent(input: perceivo.primitives.AgentInput) -> perceivo.primitives.AgentOutput:\n    \"\"\"Run one file operation.\n\n    READ_FILE and READ_DIRECTORY emit the files they read as FILE artifacts.\n    Every operation puts its result on top of the incoming request_data: the\n    operation, the path, file_count and, except for DELETE, a files list of\n    the entries read, written or listed (id, name, type, size).\n    \"\"\"\n    data = input.request_data or {}\n    if not isinstance(data, dict):\n        raise ValueError(f\"request_data must be an object, not {type(data).__name__}.\")\n\n    operation = _param(\"operation\", \"READ_FILE\").strip().upper()\n    if operation not in _OPERATIONS:\n        raise ValueError(f\"Operation is {operation!r}. Choose one of: {', '.join(_OPERATIONS)}.\")\n\n    path = _fill(\"File Path\", _param(\"path\"), data).strip()\n    segments = _segments(path)\n    if not segments and operation in (\"READ_FILE\", \"WRITE_FILE\", \"DELETE\"):\n        raise ValueError(f\"File Path is empty. {operation} needs the path of a file.\")\n\n    # Everything a write needs is checked here, before storage is touched.\n    if operation == \"WRITE_FILE\":\n        if input.artifact is not None and input.artifact.data is not None:\n            content = _content_of(input.artifact)\n        else:\n            content = _fill(\"Content\", _param(\"content\"), data)\n            if not content:\n                raise ValueError(\"WRITE_FILE needs an incoming file or some Content to write.\")\n    elif operation == \"WRITE_DIRECTORY\":\n        incoming = {}\n        if input.artifacts:\n            incoming = {key: a for key, a in input.artifacts.items() if a is not None and a.data is not None}\n        if not incoming and input.artifact is not None and input.artifact.data is not None:\n            incoming = {\"main\": input.artifact}\n        if not incoming:\n            raise ValueError(\"WRITE_DIRECTORY needs at least one incoming file.\")\n\n    passthrough = dict(data)\n    perceivo.log.info(f\"Files: {operation}\", operation=operation, path=path)\n    artifacts = []\n\n    if operation == \"READ_FILE\":\n        entry = await _resolve(segments)\n        if entry is None:\n            raise FileNotFoundError(f\"No file at {path!r} in the organization's files.\")\n        if entry.entry_type == \"folder\":\n            raise IsADirectoryError(f\"{path!r} is a folder. Use READ_DIRECTORY to read its files.\")\n        artifacts = [await _read(entry)]\n        result = {**passthrough, \"operation\": operation, \"path\": path, \"file_count\": 1, \"files\": [_listing(entry)]}\n    elif operation == \"READ_DIRECTORY\":\n        entries = [e for e in await perceivo.files.list(parent_id=await _folder(segments, path))\n                   if e.entry_type != \"folder\"]\n        entries = sorted(entries, key=lambda e: e.name)[:_MAX_FILES_PER_DIRECTORY]\n        artifacts = [await _read(entry) for entry in entries]\n        listed = [_listing(entry) for entry in entries]\n        result = {**passthrough, \"operation\": operation, \"path\": path, \"file_count\": len(listed), \"files\": listed}\n    elif operation == \"WRITE_FILE\":\n        folder_id = await _folder(segments[:-1], \"/\".join(segments[:-1]))\n        written = await _write(segments[-1], content, folder_id, _mime_for(segments[-1]))\n        result = {**passthrough, \"operation\": operation, \"path\": path, \"file_count\": 1, \"files\": [written]}\n    elif operation == \"WRITE_DIRECTORY\":\n        folder_id = await _folder(segments, path)\n        listed = []\n        for key, artifact in incoming.items():\n            name = _artifact_name(key, artifact)\n            mime_type = _mime_for(name) if artifact.mime_type in (None, \"\", \"text/plain\") else artifact.mime_type\n            listed.append(await _write(name, _content_of(artifact), folder_id, mime_type))\n        result = {**passthrough, \"operation\": operation, \"path\": path, \"file_count\": len(listed), \"files\": listed}\n    elif operation == \"LIST\":\n        entries = await perceivo.files.list(parent_id=await _folder(segments, path))\n        listed = sorted((_listing(e) for e in entries), key=lambda item: (item[\"type\"] != \"folder\", item[\"name\"]))\n        result = {**passthrough, \"operation\": operation, \"path\": path, \"file_count\": len(listed), \"files\": listed}\n    else:\n        entry = await _resolve(segments)\n        if entry is None:\n            raise FileNotFoundError(f\"No file or folder at {path!r} in the organization's files.\")\n        await perceivo.files.delete(entry.id)\n        result = {**passthrough, \"operation\": operation, \"path\": path, \"file_count\": 0}\n\n    if not artifacts:\n        return perceivo.primitives.AgentOutput(artifact=None, response_data=result)\n    # The first file read is the main artifact; READ_DIRECTORY also emits every file it read, by name.\n    return perceivo.primitives.AgentOutput(\n        artifact=artifacts[0],\n        artifacts={a.file_name: a for a in artifacts} if operation == \"READ_DIRECTORY\" else {},\n        response_data=result,\n    )\n",
+    "manifest_yaml": "extension_type: agent\nname: Files\ndescription: >\n  Runs one operation on the organization's files - read a file or a folder's\n  files, write a file or a set of files, list a folder, or delete a file or\n  folder. A path that does not exist fails the run; nothing is ever written\n  anywhere the path did not name.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    # WRITE_FILE writes the incoming file when there is one, else Content;\n    # WRITE_DIRECTORY writes every incoming file. The other operations ignore\n    # the artifact, so a file or nothing is accepted.\n    artifact_type_input: optional(file)\n    # READ_FILE emits the file, READ_DIRECTORY each file it read; the other\n    # operations emit no artifact.\n    artifact_type_output: optional(file)\n    multi_artifact: true\n    # The incoming request_data is forwarded, with the operation's result on top.\n    response_data_passthrough: request_data\n    response_data:\n      operation: string - The operation that ran.\n      path: string - The path acted on, with its placeholders filled.\n      file_count: integer - Files read, written or listed; 0 for DELETE.\n      files: array (optional) - The entries read, written or listed - id, name, type (file or folder) and size in bytes. Not set by DELETE.\n\ninput_parameters:\n  - name: operation\n    type: select\n    label: Operation\n    options: [READ_FILE, READ_DIRECTORY, WRITE_FILE, WRITE_DIRECTORY, LIST, DELETE]\n    default: READ_FILE\n    required: true\n    description: The file operation this node runs.\n  - name: path\n    type: text\n    label: File Path\n    default: \"${file_path}\"\n    description: The path from the root of the organization's files, such as reports/q3.csv. A folder for READ_DIRECTORY, WRITE_DIRECTORY and LIST, where empty means the root. Accepts ${field} placeholders.\n  - name: content\n    type: text_long\n    label: Content\n    default: \"\"\n    description: The text WRITE_FILE writes when no file arrives. Accepts ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [WRITE_FILE]\n",
+    "ports": [
+      {
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "port_type": "in",
+        "contract": {},
+        "tool_call": false,
+        "post_tool_contract": null,
+        "base_schema": null,
+        "artifact_type_constraint": null,
+        "allowed_states": null,
+        "request_data_schema": null,
+        "response_data_schema": {
+          "operation": {
+            "type": "string",
+            "required": true,
+            "description": "The operation that ran."
+          },
+          "path": {
+            "type": "string",
+            "required": true,
+            "description": "The path acted on, with its placeholders filled."
+          },
+          "file_count": {
+            "type": "integer",
+            "required": true,
+            "description": "Files read, written or listed; 0 for DELETE."
+          },
+          "files": {
+            "type": "array",
+            "required": false,
+            "description": "The entries read, written or listed - id, name, type (file or folder) and size in bytes. Not set by DELETE."
+          }
+        },
+        "artifact_type_input": "optional(file)",
+        "artifact_type_output": "optional(file)",
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "multi_artifact": true,
+        "artifact_types": [
+          "none"
+        ],
+        "response_data_passthrough_except": null
+      }
+    ],
+    "fsm_states": [],
+    "is_template_clone": false,
+    "template_source_id": null,
+    "is_prebuilt_reference": false,
+    "prebuilt_asset_id": null
+  }
+}

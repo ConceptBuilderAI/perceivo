@@ -1,0 +1,144 @@
+name: Build distributions
+
+# The one canonical build. `ci.yml` calls it on every pull request and push to
+# main, and `release.yml` calls it on a release tag, so the artifacts a release
+# uploads come from exactly the job CI exercises. Nothing in this file restores
+# a cache or keeps a credential in the checkout: `scripts/check_workflow_policy.py`
+# enforces both over release.yml's whole closure, which includes this file.
+
+on:
+  # No inputs: the commit is taken from the caller's own event, so no
+  # caller can pass an arbitrary ref. On a pull request it is the head
+  # commit; on a push, tag or dispatch it is github.sha.
+  workflow_call:
+    # The canonical file names and sha256 values. Every later job verifies
+    # distribution bytes against THESE, never against a run artifact: a job
+    # output is fixed when this job ends, and an artifact is not.
+    outputs:
+      wheel_name:
+        description: File name of the canonical wheel.
+        value: ${{ jobs.build.outputs.wheel_name }}
+      wheel_sha256:
+        description: sha256 of the canonical wheel.
+        value: ${{ jobs.build.outputs.wheel_sha256 }}
+      sdist_name:
+        description: File name of the canonical sdist.
+        value: ${{ jobs.build.outputs.sdist_name }}
+      sdist_sha256:
+        description: sha256 of the canonical sdist.
+        value: ${{ jobs.build.outputs.sdist_sha256 }}
+
+permissions: {}
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_CACHE_DIR: "1"
+  # The canonical build toolchain. Release candidates come from one operating
+  # system image, one interpreter patch release and these exact tool versions;
+  # a build from any other combination is a smoke test, not a candidate.
+  CANONICAL_PYTHON_VERSION: "3.12.14"
+  SETUPTOOLS_VERSION: "82.0.1"
+  WHEEL_VERSION: "0.48.0"
+  BUILD_VERSION: "1.6.1"
+  TWINE_VERSION: "7.0.0"
+
+jobs:
+  build:
+    name: Build and reproduce distributions
+    # Pinned image, not "latest": the canonical artifacts must not change when
+    # the hosted runner label is repointed at a newer Ubuntu release.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      wheel_name: ${{ steps.digests.outputs.wheel_name }}
+      wheel_sha256: ${{ steps.digests.outputs.wheel_sha256 }}
+      sdist_name: ${{ steps.digests.outputs.sdist_name }}
+      sdist_sha256: ${{ steps.digests.outputs.sdist_sha256 }}
+    steps:
+      - name: Require a full commit SHA
+        env:
+          BUILD_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          [[ "$BUILD_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "ref '$BUILD_REF' is not a full commit SHA"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Check out the archived source commit itself. The default pull-request
+          # checkout is a synthetic merge commit whose commit time is minted at
+          # merge-ref creation, so its %ct changes on every rebuild and would
+          # make SOURCE_DATE_EPOCH — and therefore the artifacts — unreproducible.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12.14"
+      - name: Confirm the canonical interpreter
+        run: python -c "import os,platform,sys; actual=platform.python_version(); print(actual); sys.exit(0 if actual==os.environ['CANONICAL_PYTHON_VERSION'] else 1)"
+      - name: Install the pinned build backend and tools
+        # Wheels only: no third-party setup script runs here. The only code
+        # built from source in this job is this repository's own package.
+        run: |
+          python -m pip install --only-binary :all: \
+            "setuptools==$SETUPTOOLS_VERSION" \
+            "wheel==$WHEEL_VERSION" \
+            "build==$BUILD_VERSION" \
+            "twine==$TWINE_VERSION"
+          python -m pip list
+      - name: Record the archived source commit and reproducible-build epoch
+        env:
+          BUILD_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          archived_commit="$(git rev-parse HEAD)"
+          [ "$archived_commit" = "$BUILD_REF" ] || { echo "HEAD $archived_commit is not $BUILD_REF"; exit 1; }
+          archived_epoch="$(git show -s --format=%ct HEAD)"
+          echo "ARCHIVED_COMMIT=$archived_commit" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$archived_epoch" >> "$GITHUB_ENV"
+          echo "archived commit $archived_commit at epoch $archived_epoch"
+      - name: Create two clean source trees
+        run: |
+          mkdir build-one build-two dist-one dist-two
+          git archive "$ARCHIVED_COMMIT" | tar -x -C build-one
+          git archive "$ARCHIVED_COMMIT" | tar -x -C build-two
+      - name: Build twice with the pinned backend
+        # --no-isolation makes the installed pins above the backend that runs,
+        # instead of whatever build would resolve into a fresh virtual env.
+        run: |
+          python -m build --no-isolation --outdir "$GITHUB_WORKSPACE/dist-one" build-one
+          python -m build --no-isolation --outdir "$GITHUB_WORKSPACE/dist-two" build-two
+          echo "hashes as built:"
+          sha256sum -- dist-one/* dist-two/*
+      - name: Canonicalize both distribution sets
+        run: |
+          for directory in dist-one dist-two; do
+            python scripts/verify_public_tree.py canonicalize-sdist --source "$directory"/*.tar.gz
+            python scripts/verify_public_tree.py canonicalize-wheel --source "$directory"/*.whl
+          done
+      - name: Check metadata and reproducibility
+        run: |
+          python -m twine check dist-one/*
+          python scripts/verify_public_tree.py compare-archives \
+            --first dist-one --second dist-two
+          (cd dist-one && sha256sum -- *) | sort > canonical-one.sha256
+          (cd dist-two && sha256sum -- *) | sort > canonical-two.sha256
+          echo "canonical hashes:"
+          cat canonical-one.sha256
+          diff -u canonical-one.sha256 canonical-two.sha256
+      - name: Verify archive boundary
+        run: |
+          python scripts/verify_public_tree.py archives \
+            --root . \
+            --wheel dist-one/*.whl \
+            --sdist dist-one/*.tar.gz
+      - name: Record the canonical names and digests as job outputs
+        id: digests
+        run: |
+          set -euo pipefail
+          python scripts/compare_index_artifacts.py digests --dist dist-one --sums canonical-one.sha256 > digests.txt
+          cat digests.txt
+          cat digests.txt >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distributions
+          path: dist-one/*
+          if-no-files-found: error

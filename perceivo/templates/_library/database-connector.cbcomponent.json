@@ -1,0 +1,369 @@
+{
+  "component": {
+    "additional_packages": [
+      "aioodbc",
+      "aiosqlite",
+      "asyncpg",
+      "google-cloud-bigquery"
+    ],
+    "artifact_type_input": "none",
+    "artifact_type_output": "json",
+    "asset_id": null,
+    "category": "AGENT",
+    "config": {
+      "icon": {
+        "type": "lucide",
+        "value": "database"
+      },
+      "input_parameters": {
+        "declarations": [
+          {
+            "name": "connection_mode",
+            "type": "select",
+            "label": "Connection Mode",
+            "options": [
+              "platform",
+              "external"
+            ],
+            "default": "platform",
+            "required": true
+          },
+          {
+            "name": "platform_database_id",
+            "type": "text",
+            "label": "Database ID",
+            "description": "UUID of the platform-provisioned database to query.",
+            "depends_on": {
+              "parameter": "connection_mode",
+              "visible_when": [
+                "platform"
+              ]
+            }
+          },
+          {
+            "name": "db_type",
+            "type": "select",
+            "label": "Database Type",
+            "options": [
+              "postgresql",
+              "mssql",
+              "sqlite",
+              "bigquery"
+            ],
+            "default": "postgresql",
+            "required": true,
+            "depends_on": {
+              "parameter": "connection_mode",
+              "visible_when": [
+                "external"
+              ]
+            }
+          },
+          {
+            "name": "operation",
+            "type": "select",
+            "label": "Operation",
+            "options": [
+              "SELECT",
+              "INSERT",
+              "UPDATE",
+              "DELETE",
+              "CUSTOM"
+            ],
+            "default": "SELECT",
+            "required": true
+          },
+          {
+            "name": "schema_name",
+            "type": "text",
+            "label": "Schema Name",
+            "default": "public",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT",
+                "INSERT",
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          {
+            "name": "table_name",
+            "type": "text",
+            "label": "Table Name",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT",
+                "INSERT",
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          {
+            "name": "columns",
+            "type": "text",
+            "label": "Columns",
+            "default": "*",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT"
+              ]
+            }
+          },
+          {
+            "name": "where_clause",
+            "type": "text",
+            "label": "WHERE Clause",
+            "description": "Supports ${field} placeholders resolved from request_data as quoted literals; a missing field is an error.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT",
+                "UPDATE",
+                "DELETE"
+              ]
+            }
+          },
+          {
+            "name": "group_by",
+            "type": "text",
+            "label": "GROUP BY",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT"
+              ]
+            }
+          },
+          {
+            "name": "order_by",
+            "type": "text",
+            "label": "ORDER BY",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT"
+              ]
+            }
+          },
+          {
+            "name": "max_rows",
+            "type": "integer",
+            "label": "Max Rows",
+            "default": 100,
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT"
+              ]
+            }
+          },
+          {
+            "name": "insert_columns",
+            "type": "text",
+            "label": "Insert Columns",
+            "description": "Comma-separated column list for INSERT.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "INSERT"
+              ]
+            }
+          },
+          {
+            "name": "insert_values",
+            "type": "text",
+            "label": "Insert Values",
+            "description": "Comma-separated values for INSERT. Supports ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "INSERT"
+              ]
+            }
+          },
+          {
+            "name": "set_clause",
+            "type": "text",
+            "label": "SET Clause",
+            "description": "e.g. status = ${new_status}. Supports ${field} placeholders.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "UPDATE"
+              ]
+            }
+          },
+          {
+            "name": "custom_query",
+            "type": "text_long",
+            "label": "Custom SQL",
+            "description": "Raw SQL. Supports ${field} placeholders resolved from request_data.",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "CUSTOM"
+              ]
+            }
+          },
+          {
+            "name": "response_field_name",
+            "type": "text",
+            "label": "Response Field Name",
+            "description": "Wrap result rows under this key (e.g. \"users\" produces {users: [...]}).",
+            "depends_on": {
+              "parameter": "operation",
+              "visible_when": [
+                "SELECT",
+                "CUSTOM"
+              ]
+            }
+          }
+        ],
+        "values": {
+          "columns": "*",
+          "connection_mode": "platform",
+          "db_type": "postgresql",
+          "max_rows": 100,
+          "operation": "SELECT",
+          "platform_database_id": "",
+          "schema_name": "public",
+          "table_name": ""
+        }
+      },
+      "is_database_connector": true,
+      "port_order": [
+        "input",
+        "output"
+      ],
+      "port_sides": {
+        "input": "top",
+        "output": "bottom"
+      },
+      "required_secrets": [
+        {
+          "name": "connection_string",
+          "label": "Database Connection String",
+          "required": false,
+          "description": "External mode only. postgresql: postgresql://user:password@host:5432/db; mssql: mssql://user:password@host:1433/db (add ?TrustServerCertificate=yes only for a self-signed certificate); sqlite: sqlite:///path/to/file.db; bigquery: a service-account JSON key."
+        }
+      ],
+      "detected_endpoints": [
+        {
+          "category": "database",
+          "library": "asyncpg",
+          "host": null,
+          "confidence": "detected",
+          "description": "PostgreSQL async client"
+        },
+        {
+          "category": "database",
+          "library": "perceivo.managed_service.database",
+          "host": null,
+          "confidence": "detected",
+          "description": "Perceivo org dedicated database"
+        }
+      ]
+    },
+    "description": "What it does Reads from or writes to a SQL database as a step in a flow. It can use a database the platform provisioned for your organization, or one you already run elsewhere: PostgreSQL, SQL Server, SQLite or BigQuery.\n\nHow it works Two modes. In platform mode the statement runs through the platform against a database it manages for your organization, and your database privileges are checked; a query needs the query privilege and a write the write privilege. In external mode it connects out to your own database with a connection string bound as a secret, so the host needs an outbound route. Build the statement from the Inspector fields - pick the operation, name the table and columns, add a WHERE - or write the exact SQL yourself. ${field} placeholders take their values from the incoming data and are always inserted as quoted literals, never as raw SQL; a placeholder whose field is missing stops the run rather than becoming NULL. Results come back as rows, capped by Max Rows, with truncated set when there were more. A bad setting stops the run before anything is sent. In platform mode a missing privilege or a stopped database is returned as a result with success false so the flow can branch; any other failure stops the run. Neither the SQL nor any row is written to the logs.\n\nConfigure Connection\n- Connection Mode - platform (default) or external.\n- Database ID - which provisioned database, in platform mode.\n- Database Type - postgresql (default), mssql, sqlite or bigquery, in external mode.\n- Database Connection String - bound as a secret, external mode only: postgresql://user:password@host:5432/db, mssql://user:password@host:1433/db (the certificate is verified; add ?TrustServerCertificate=yes only for a self-signed one), sqlite:///path/to/existing.db, or a BigQuery service-account JSON key.\nStatement\n- Operation - SELECT (default), INSERT, UPDATE, DELETE or CUSTOM.\n- Schema Name (public, ignored on SQL Server and SQLite), Table Name, Columns (* by default).\n- WHERE Clause - for SELECT, UPDATE and DELETE. GROUP BY and ORDER BY - for SELECT.\n- Insert Columns and Insert Values - for INSERT. SET Clause - for UPDATE.\n- Custom SQL - the full statement when Operation is CUSTOM; everything above is ignored. A statement starting with SELECT or WITH reads; anything else is sent as a write.\n- Max Rows - result cap, 100 by default, at most 10000.\n- Response Field Name - put the rows under this key, merged into the incoming data.\n\nIn and out In: any data; its fields fill the ${field} placeholders. Out: success, operation, rows (one object per row), row_count, columns and truncated; a write returns affected_rows and a message instead of rows. With Response Field Name set, the incoming data plus the rows under that key. A refusal returns success false with error and error_type.\n\nUse it when\n- A flow needs to look up reference data before deciding what to do.\n- You want to record the outcome of a run in a table.\n- An existing reporting database has to feed a model or a decision step.",
+    "fsm_states": [],
+    "is_prebuilt_reference": false,
+    "is_template_clone": false,
+    "manifest_yaml": "extension_type: agent\nname: Database Connector\ndescription: >\n  Execute one SQL statement (SELECT, INSERT, UPDATE, DELETE, or custom)\n  against a platform-provisioned PostgreSQL database or an external\n  PostgreSQL, SQL Server, SQLite or BigQuery database. Platform queries run\n  through the platform; external credentials come only from the\n  connection_string secret bound on the orchestration node. A bad setting\n  raises before anything is sent; a platform refusal (403, 409) is a result\n  with success false; any other failure fails the run.\n\ninput_ports:\n  - port_name: input\n    port_type: in\n    artifact_type_input: none\n    artifact_type_output: json\n    # The response_field_name path spreads the inbound request_data into the\n    # result (`{**request_data, response_field: rows}`).\n    response_data_passthrough: request_data\n    # That same path writes the rows under a key named by response_field_name,\n    # so one key is chosen at configuration time.\n    response_data_contract: dynamic\n    response_data_contract_reason: >\n      When the `response_field_name` parameter is set the result rows are\n      returned under that configured key (`{**request_data, response_field:\n      rows}`), so the key set is fixed only once the node is configured.\n    response_data:\n      affected_rows: integer (optional) - Rows changed; INSERT/UPDATE/DELETE only.\n      columns: array - Column names returned by the query.\n      error: string (optional) - Failure description; error results only.\n      error_type: string (optional) - Refusal class (PermissionError, ServiceUnavailable).\n      message: string (optional) - Human-readable write summary; INSERT/UPDATE/DELETE only.\n      operation: string - Operation that ran (SELECT, INSERT, UPDATE, DELETE, CUSTOM).\n      row_count: integer - Rows returned by the query.\n      rows: array - Result rows as column-keyed dicts; empty for write operations.\n      success: boolean - Whether the query completed.\n      truncated: boolean - Whether the result set hit the max_rows ceiling.\n\nrequired_secrets:\n  - name: connection_string\n    label: Database Connection String\n    required: false\n    description: >-\n      External mode only. postgresql: postgresql://user:password@host:5432/db;\n      mssql: mssql://user:password@host:1433/db (add ?TrustServerCertificate=yes\n      only for a self-signed certificate); sqlite: sqlite:///path/to/file.db;\n      bigquery: a service-account JSON key.\n\ninput_parameters:\n  - name: connection_mode\n    type: select\n    label: Connection Mode\n    options: [platform, external]\n    default: platform\n    required: true\n  - name: platform_database_id\n    type: text\n    label: Database ID\n    description: UUID of the platform-provisioned database to query.\n    depends_on:\n      parameter: connection_mode\n      visible_when: [platform]\n  - name: db_type\n    type: select\n    label: Database Type\n    options: [postgresql, mssql, sqlite, bigquery]\n    default: postgresql\n    required: true\n    depends_on:\n      parameter: connection_mode\n      visible_when: [external]\n  - name: operation\n    type: select\n    label: Operation\n    options: [SELECT, INSERT, UPDATE, DELETE, CUSTOM]\n    default: SELECT\n    required: true\n  - name: schema_name\n    type: text\n    label: Schema Name\n    default: public\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT, INSERT, UPDATE, DELETE]\n  - name: table_name\n    type: text\n    label: Table Name\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT, INSERT, UPDATE, DELETE]\n  - name: columns\n    type: text\n    label: Columns\n    default: \"*\"\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT]\n  - name: where_clause\n    type: text\n    label: WHERE Clause\n    description: Supports ${field} placeholders resolved from request_data as quoted literals; a missing field is an error.\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT, UPDATE, DELETE]\n  - name: group_by\n    type: text\n    label: GROUP BY\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT]\n  - name: order_by\n    type: text\n    label: ORDER BY\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT]\n  - name: max_rows\n    type: integer\n    label: Max Rows\n    default: 100\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT]\n  - name: insert_columns\n    type: text\n    label: Insert Columns\n    description: Comma-separated column list for INSERT.\n    depends_on:\n      parameter: operation\n      visible_when: [INSERT]\n  - name: insert_values\n    type: text\n    label: Insert Values\n    description: Comma-separated values for INSERT. Supports ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [INSERT]\n  - name: set_clause\n    type: text\n    label: SET Clause\n    description: e.g. status = ${new_status}. Supports ${field} placeholders.\n    depends_on:\n      parameter: operation\n      visible_when: [UPDATE]\n  - name: custom_query\n    type: text_long\n    label: Custom SQL\n    description: Raw SQL. Supports ${field} placeholders resolved from request_data.\n    depends_on:\n      parameter: operation\n      visible_when: [CUSTOM]\n  - name: response_field_name\n    type: text\n    label: Response Field Name\n    description: 'Wrap result rows under this key (e.g. \"users\" produces {users: [...]}).'\n    depends_on:\n      parameter: operation\n      visible_when: [SELECT, CUSTOM]\n",
+    "name": "DATABASE CONNECTOR (SYSTEM, READ-ONLY)",
+    "ports": [
+      {
+        "allowed_states": null,
+        "artifact_input_schema": null,
+        "artifact_output_schema": null,
+        "artifact_type_constraint": null,
+        "artifact_type_input": "none",
+        "artifact_type_output": "json",
+        "artifact_types": [
+          "none"
+        ],
+        "base_schema": null,
+        "contract": {},
+        "direction": "IN",
+        "key": "input",
+        "label": "Input",
+        "multi_artifact": false,
+        "port_type": "in",
+        "post_tool_contract": null,
+        "request_data_schema": null,
+        "response_data_passthrough_except": null,
+        "response_data_schema": {
+          "affected_rows": {
+            "type": "integer",
+            "required": false,
+            "description": "Rows changed; INSERT/UPDATE/DELETE only."
+          },
+          "columns": {
+            "type": "array",
+            "required": true,
+            "description": "Column names returned by the query."
+          },
+          "error": {
+            "type": "string",
+            "required": false,
+            "description": "Failure description; error results only."
+          },
+          "error_type": {
+            "type": "string",
+            "required": false,
+            "description": "Refusal class (PermissionError, ServiceUnavailable)."
+          },
+          "message": {
+            "type": "string",
+            "required": false,
+            "description": "Human-readable write summary; INSERT/UPDATE/DELETE only."
+          },
+          "operation": {
+            "type": "string",
+            "required": true,
+            "description": "Operation that ran (SELECT, INSERT, UPDATE, DELETE, CUSTOM)."
+          },
+          "row_count": {
+            "type": "integer",
+            "required": true,
+            "description": "Rows returned by the query."
+          },
+          "rows": {
+            "type": "array",
+            "required": true,
+            "description": "Result rows as column-keyed dicts; empty for write operations."
+          },
+          "success": {
+            "type": "boolean",
+            "required": true,
+            "description": "Whether the query completed."
+          },
+          "truncated": {
+            "type": "boolean",
+            "required": true,
+            "description": "Whether the result set hit the max_rows ceiling."
+          }
+        },
+        "tool_call": false
+      }
+    ],
+    "prebuilt_asset_id": null,
+    "requires_gpu": false,
+    "script": "import asyncio\nimport datetime\nimport decimal\nimport json\nimport math\nimport re\nimport uuid\nfrom urllib.parse import parse_qs, quote, unquote, urlparse\n\nimport perceivo\n\n_OPERATIONS = (\"SELECT\", \"INSERT\", \"UPDATE\", \"DELETE\", \"CUSTOM\")\n_MODES = (\"platform\", \"external\")\n_DB_TYPES = (\"postgresql\", \"mssql\", \"sqlite\", \"bigquery\")\n\n# A CUSTOM statement starting with one of these only reads; any other CUSTOM\n# statement is sent as a write, which needs the write privilege in platform mode.\n_READ_KEYWORDS = (\"SELECT\", \"WITH\", \"SHOW\", \"EXPLAIN\", \"VALUES\", \"TABLE\")\n\n# The platform caps a query at 10000 rows; the same ceiling applies everywhere.\n_MAX_ROWS_CAP = 10000\n\n# ${field} placeholders are resolved from request_data. The author-quoted form\n# ('${field}') is one placeholder, so a string is never quoted twice.\n_QUOTED_PARAM = re.compile(r\"'\\$\\{(\\w+)\\}'\")\n_PARAM = re.compile(r\"\\$\\{(\\w+)\\}\")\n# A PostgreSQL dollar-quoted string opens with $$ or $tag$ and closes with the same.\n# A tag may hold any non-ASCII character, as a PostgreSQL identifier may.\n_DOLLAR_TAG = re.compile(r\"\\$(?:[A-Za-z_\\u0080-\\U0010ffff][A-Za-z0-9_\\u0080-\\U0010ffff]*)?\\$\")\n\n\ndef _word_char(template: str, i: int) -> bool:\n    \"\"\"Whether template[i] exists and could continue an identifier or keyword.\"\"\"\n    if not 0 <= i < len(template):\n        return False\n    char = template[i]\n    return char.isalnum() or char in \"_$\" or ord(char) > 0x7F\n\n\ndef _continues(template: str, j: int) -> int:\n    \"\"\"Where a PostgreSQL string closed just before j continues, or -1.\n\n    PostgreSQL joins two string constants separated only by whitespace that holds a\n    newline (a -- comment counts as whitespace), and the second keeps the first's\n    escape rules: E'a'<newline>'\\\\'' is one backslash-escaped string.\n    \"\"\"\n    n = len(template)\n    newline = False\n    while j < n:\n        if template[j] in \"\\r\\n\":\n            newline = True\n            j += 1\n        elif template[j] in \" \\t\\f\\v\":\n            j += 1\n        elif template.startswith(\"--\", j):\n            j = _line_end(template, j, \"postgresql\")\n        else:\n            break\n    return j if newline and template[j : j + 1] == \"'\" else -1\n\n\ndef _line_end(template: str, i: int, db_type: str) -> int:\n    \"\"\"Where the line comment starting at i ends.\n\n    PostgreSQL ends one at a CR or an LF. The others end it at an LF, and a lone CR\n    inside it is refused: an engine that reads that CR as a line end would see the\n    rest of the line as SQL, where a quote could hide.\n    \"\"\"\n    n = len(template)\n    lf = template.find(\"\\n\", i)\n    lf = n if lf < 0 else lf\n    cr = template.find(\"\\r\", i, lf)\n    if cr < 0:\n        return lf\n    if db_type == \"postgresql\":\n        return cr\n    if cr != lf - 1:\n        raise ValueError(\n            \"The statement has a carriage return inside a comment with no line feed after \"\n            \"it. Use LF or CRLF line endings.\"\n        )\n    return lf\n\n\ndef _param(name: str, default: str = \"\") -> str:\n    value = perceivo.params.get(name, default)\n    return str(default if value is None else value).strip()\n\n\ndef _choice(name: str, default: str, options: tuple, label: str, upper: bool = False) -> str:\n    value = _param(name, default) or default\n    value = value.upper() if upper else value.lower()\n    if value not in options:\n        raise ValueError(f\"{label} is {value!r}. Choose one of: {', '.join(options)}.\")\n    return value\n\n\ndef _max_rows() -> int:\n    \"\"\"Max Rows as a whole number of at least 1, capped at the platform ceiling.\"\"\"\n    raw = perceivo.params.get(\"max_rows\", 100)\n    if raw is None or str(raw).strip() == \"\":\n        return 100\n    if isinstance(raw, float) and raw.is_integer():\n        raw = int(raw)\n    try:\n        if isinstance(raw, bool):\n            raise ValueError\n        value = int(str(raw).strip())\n    except ValueError:\n        raise ValueError(f\"Max Rows must be a whole number, not {raw!r}.\") from None\n    if value < 1:\n        raise ValueError(\"Max Rows must be at least 1.\")\n    return min(value, _MAX_ROWS_CAP)\n\n\ndef _literal(value, db_type: str) -> str:\n    \"\"\"Render one request_data value as a quoted SQL literal for db_type.\"\"\"\n    if value is None:\n        return \"NULL\"\n    if isinstance(value, bool):\n        if db_type == \"mssql\":\n            return \"1\" if value else \"0\"\n        return \"TRUE\" if value else \"FALSE\"\n    if isinstance(value, (int, float)):\n        if isinstance(value, float) and not math.isfinite(value):\n            raise ValueError(\"A placeholder value is not a finite number.\")\n        return repr(value)\n    if isinstance(value, (dict, list)):\n        value = json.dumps(value)\n    text = str(value)\n    if db_type == \"bigquery\":\n        # BigQuery escapes with backslashes and refuses a raw newline in a string.\n        escaped = (\n            text.replace(\"\\\\\", \"\\\\\\\\\").replace(\"'\", \"\\\\'\").replace(\"\\n\", \"\\\\n\").replace(\"\\r\", \"\\\\r\")\n        )\n        return \"'\" + escaped + \"'\"\n    if db_type == \"postgresql\":\n        # An escape string reads the same whatever precedes it and whatever\n        # standard_conforming_strings says: a value can never be read in another mode.\n        return \"E'\" + text.replace(\"\\\\\", \"\\\\\\\\\").replace(\"'\", \"''\") + \"'\"\n    quoted = \"'\" + text.replace(\"'\", \"''\") + \"'\"\n    return \"N\" + quoted if db_type == \"mssql\" else quoted\n\n\ndef _region_end(template: str, i: int, db_type: str):\n    \"\"\"Where the comment, string or quoted name starting at i ends, and what it is.\n\n    Returns (end, kind), or (i, None) when nothing of the kind starts at i. An\n    unterminated region runs to the end of the statement.\n    \"\"\"\n    n = len(template)\n    pair = template[i : i + 2]\n    if pair == \"--\" or (template[i] == \"#\" and db_type == \"bigquery\"):\n        return _line_end(template, i, db_type), \"a comment\"\n    if pair == \"/*\":\n        # PostgreSQL and SQL Server nest block comments; the others end at the first */.\n        nests = db_type in (\"postgresql\", \"mssql\")\n        depth = 0\n        j = i\n        while j < n:\n            if template.startswith(\"/*\", j) and (nests or depth == 0):\n                depth += 1\n                j += 2\n            elif template.startswith(\"*/\", j):\n                depth -= 1\n                j += 2\n                if depth == 0:\n                    return j, \"a comment\"\n            else:\n                j += 1\n        return n, \"a comment\"\n    char = template[i]\n    if char == \"'\" or (char == '\"' and db_type == \"bigquery\"):\n        if db_type == \"bigquery\":\n            # BigQuery escapes only with a backslash, and three quotes open a\n            # triple-quoted string that only three quotes close.\n            close = char * 3 if template.startswith(char * 3, i) else char\n            j = i + len(close)\n            while j < n:\n                if template[j] == \"\\\\\":\n                    j += 2\n                elif template.startswith(close, j):\n                    return j + len(close), \"a quoted string\"\n                else:\n                    j += 1\n            return n, \"a quoted string\"\n        # A PostgreSQL E'...' string also escapes with a backslash.\n        backslash = (\n            db_type == \"postgresql\"\n            and i > 0\n            and template[i - 1] in \"eE\"\n            and not _word_char(template, i - 2)\n        )\n        j = i + 1\n        while j < n:\n            if backslash and template[j] == \"\\\\\":\n                j += 2\n                continue\n            if template[j] == char:\n                if template[j + 1 : j + 2] == char:\n                    j += 2\n                    continue\n                if char == \"'\" and db_type == \"postgresql\":\n                    more = _continues(template, j + 1)\n                    if more >= 0:\n                        j = more + 1\n                        continue\n                return j + 1, \"a quoted string\"\n            j += 1\n        return n, \"a quoted string\"\n    if char == '\"' or char == \"`\" or (char == \"[\" and db_type in (\"mssql\", \"sqlite\")):\n        close = \"]\" if char == \"[\" else char\n        # A BigQuery quoted name escapes with a backslash, as its strings do.\n        backslash = char == \"`\" and db_type == \"bigquery\"\n        j = i + 1\n        while j < n:\n            if backslash and template[j] == \"\\\\\":\n                j += 2\n                continue\n            if template[j] == close:\n                if backslash:\n                    return j + 1, \"a quoted name\"\n                if template[j + 1 : j + 2] == close:\n                    j += 2\n                    continue\n                return j + 1, \"a quoted name\"\n            j += 1\n        return n, \"a quoted name\"\n    # In a name such as a$b$ the $b$ is part of the name, not a dollar quote.\n    dollar = db_type == \"postgresql\" and not _word_char(template, i - 1)\n    tag = _DOLLAR_TAG.match(template, i) if dollar else None\n    if tag:\n        end = template.find(tag.group(0), tag.end())\n        return (n if end < 0 else end + len(tag.group(0))), \"a quoted string\"\n    return i, None\n\n\ndef _resolve(template: str, request_data: dict, db_type: str) -> str:\n    \"\"\"Replace every ${field} with request_data[field] as a quoted literal.\n\n    A field the statement names but request_data lacks is a configuration error,\n    never a silent NULL: `SET status = ${status}` must not blank a column.\n\n    A placeholder may stand only where a value goes. Inside a string the author\n    quoted, such as '%${q}%', its value would land inside that string, where one\n    quote ends the string and the rest runs as SQL, so it is refused. Build the\n    string by concatenation instead: '%' || ${q} || '%' (CONCAT('%', ${q}, '%') on\n    SQL Server and BigQuery). The statement is read the way the database reads it:\n    a quote inside a comment or a quoted name opens no string, and a placeholder\n    inside a comment or a quoted name is refused too, because a value with a\n    newline would end the comment, and a value cannot name a table or column. A\n    placeholder joined to the word before it, such as E'${q}', U&'${q}' or N${q}, is refused,\n    because the prefix would change how the database reads the quoted value; so is one\n    joined to the quote before it, such as 'a'${q}, which would extend that string. On\n    PostgreSQL a value is an escape string, E'...', so it reads the same after any\n    string, continued or not. PostgreSQL ends a line at a CR as well as an LF; on the\n    other engines a lone CR inside a comment is refused.\n    \"\"\"\n\n    def literal(name: str) -> str:\n        if name not in request_data:\n            raise ValueError(\n                f\"The statement uses the placeholder for {name!r} but request_data has no \"\n                f\"field {name!r}.\"\n            )\n        return _literal(request_data[name], db_type)\n\n    out = []\n    i = 0\n    while i < len(template):\n        placeholder = _QUOTED_PARAM.match(template, i) or _PARAM.match(template, i)\n        if placeholder:\n            if _word_char(template, i - 1) or template[max(i - 2, 0) : i].lower() == \"u&\":\n                raise ValueError(\n                    f\"The placeholder for {placeholder.group(1)!r} is joined to the word \"\n                    \"before it. Put a space or an operator between them.\"\n                )\n            if i > 0 and template[i - 1] in \"'\\\"`]\":\n                raise ValueError(\n                    f\"The placeholder for {placeholder.group(1)!r} is joined to the quote \"\n                    \"before it. Put a space or an operator between them.\"\n                )\n            out.append(literal(placeholder.group(1)))\n            i = placeholder.end()\n            continue\n        end, kind = _region_end(template, i, db_type)\n        if kind:\n            inside = _PARAM.search(template, i, end)\n            if inside:\n                name = inside.group(1)\n                if kind == \"a quoted string\":\n                    hint = f\"Concatenate it instead, for example '%' || ${{{name}}} || '%'.\"\n                elif kind == \"a comment\":\n                    hint = \"Move it out of the comment.\"\n                else:\n                    hint = \"A value cannot name a table or column.\"\n                raise ValueError(f\"The placeholder for {name!r} is inside {kind}. {hint}\")\n            out.append(template[i:end])\n            i = end\n            continue\n        out.append(template[i])\n        i += 1\n    return \"\".join(out)\n\n\ndef _table(db_type: str) -> str:\n    table = _param(\"table_name\")\n    if not table:\n        raise ValueError(\"Table Name is required for SELECT, INSERT, UPDATE and DELETE.\")\n    schema = _param(\"schema_name\", \"public\")\n    # \"public\" is PostgreSQL's default schema; elsewhere it is treated as unset.\n    if schema == \"public\" and db_type in (\"mssql\", \"sqlite\"):\n        schema = \"\"\n    return f\"{schema}.{table}\" if schema else table\n\n\ndef _where(request_data: dict, db_type: str) -> str:\n    where = _param(\"where_clause\")\n    return f\" WHERE {_resolve(where, request_data, db_type)}\" if where else \"\"\n\n\ndef _build_query(operation: str, request_data: dict, db_type: str, fetch: int) -> str:\n    \"\"\"The statement for operation. A SELECT asks for fetch rows (Max Rows + 1).\"\"\"\n    if operation == \"CUSTOM\":\n        raw = _param(\"custom_query\")\n        if not raw:\n            raise ValueError(\"Operation is CUSTOM but Custom SQL is empty.\")\n        return _resolve(raw, request_data, db_type)\n\n    table = _table(db_type)\n\n    if operation == \"SELECT\":\n        columns = _param(\"columns\", \"*\") or \"*\"\n        sql_tail = f\" FROM {table}{_where(request_data, db_type)}\"\n        group_by = _param(\"group_by\")\n        if group_by:\n            sql_tail += f\" GROUP BY {group_by}\"\n        order_by = _param(\"order_by\")\n        if order_by:\n            sql_tail += f\" ORDER BY {order_by}\"\n        if db_type == \"mssql\":\n            distinct = \"\"\n            if columns[:9].upper() == \"DISTINCT \":\n                distinct, columns = \"DISTINCT \", columns[9:].lstrip()\n            return f\"SELECT {distinct}TOP {fetch} {columns}{sql_tail}\"\n        return f\"SELECT {columns}{sql_tail} LIMIT {fetch}\"\n\n    if operation == \"INSERT\":\n        insert_columns = _param(\"insert_columns\")\n        insert_values = _param(\"insert_values\")\n        if not insert_columns or not insert_values:\n            raise ValueError(\"INSERT needs both Insert Columns and Insert Values.\")\n        values_sql = _resolve(insert_values, request_data, db_type)\n        return f\"INSERT INTO {table} ({insert_columns}) VALUES ({values_sql})\"\n\n    if operation == \"UPDATE\":\n        set_clause = _param(\"set_clause\")\n        if not set_clause:\n            raise ValueError(\"UPDATE needs a SET Clause.\")\n        set_sql = _resolve(set_clause, request_data, db_type)\n        return f\"UPDATE {table} SET {set_sql}{_where(request_data, db_type)}\"\n\n    return f\"DELETE FROM {table}{_where(request_data, db_type)}\"\n\n\ndef _json_safe(value):\n    \"\"\"A driver value as JSON, the same way the platform serializes its rows.\"\"\"\n    if value is None or isinstance(value, (bool, int, str)):\n        return value\n    if isinstance(value, float):\n        return value if math.isfinite(value) else str(value)\n    if isinstance(value, decimal.Decimal):\n        return float(value)\n    if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):\n        return value.isoformat()\n    if isinstance(value, uuid.UUID):\n        return str(value)\n    if isinstance(value, (bytes, bytearray, memoryview)):\n        return f\"(binary, {len(bytes(value))} bytes)\"\n    if isinstance(value, dict):\n        return {str(key): _json_safe(item) for key, item in value.items()}\n    if isinstance(value, (list, tuple)):\n        return [_json_safe(item) for item in value]\n    return str(value)\n\n\ndef _rows(columns: list, records, max_rows: int) -> dict:\n    \"\"\"Key each record by column, cap it at max_rows and say whether it was cut.\"\"\"\n    records = list(records)\n    truncated = len(records) > max_rows\n    rows = [\n        {column: _json_safe(value) for column, value in zip(columns, record, strict=True)}\n        for record in records[:max_rows]\n    ]\n    return {\"columns\": columns, \"rows\": rows, \"row_count\": len(rows), \"truncated\": truncated}\n\n\ndef _affected(count, truncated: bool = False) -> dict:\n    count = count if isinstance(count, int) and count >= 0 else 0\n    return {\"columns\": [], \"rows\": [], \"row_count\": count, \"truncated\": truncated}\n\n\ndef _connect_failed(db_type: str, exc: Exception) -> ConnectionError:\n    # The driver's message can echo the connection string, so only its type is kept.\n    return ConnectionError(\n        f\"Could not connect to the external {db_type} database ({type(exc).__name__}). \"\n        \"Check the connection_string secret and that the host has an outbound route.\"\n    )\n\n\ndef _mssql_dsn(connection_string: str) -> str:\n    \"\"\"mssql://user:password@host:port/database[?TrustServerCertificate=yes] as an ODBC DSN.\"\"\"\n    parsed = urlparse(connection_string)\n    database = parsed.path.lstrip(\"/\")\n    if not parsed.hostname or not database or parsed.username is None:\n        raise ValueError(\n            \"The connection_string secret for mssql must look like \"\n            \"mssql://user:password@host:1433/database.\"\n        )\n\n    def braced(value) -> str:\n        return \"{\" + str(value).replace(\"}\", \"}}\") + \"}\"\n\n    options = parse_qs(parsed.query)\n    trust = (options.get(\"TrustServerCertificate\") or [\"no\"])[0].lower() in (\"yes\", \"true\", \"1\")\n    parts = [\n        \"DRIVER={ODBC Driver 18 for SQL Server}\",\n        f\"SERVER={braced(f'{parsed.hostname},{parsed.port or 1433}')}\",\n        f\"DATABASE={braced(unquote(database))}\",\n        f\"UID={braced(unquote(parsed.username))}\",\n        f\"PWD={braced(unquote(parsed.password or ''))}\",\n        \"Encrypt=yes\",\n        f\"TrustServerCertificate={'yes' if trust else 'no'}\",\n    ]\n    return \";\".join(parts) + \";\"\n\n\ndef _sqlite_uri(connection_string: str) -> str:\n    path = connection_string\n    for prefix in (\"sqlite:///\", \"sqlite://\"):\n        if path.startswith(prefix):\n            path = path[len(prefix) :]\n            break\n    if not path:\n        raise ValueError(\"The connection_string secret for sqlite must name a database file.\")\n    # mode=rw: a missing file is an error, never a new empty database.\n    return \"file:\" + quote(path.replace(\"\\\\\", \"/\"), safe=\"/:\") + \"?mode=rw\"\n\n\ndef _bigquery_credentials(connection_string: str) -> dict:\n    try:\n        info = json.loads(connection_string)\n    except ValueError:\n        info = None\n    if not isinstance(info, dict) or not info.get(\"client_email\") or not info.get(\"project_id\"):\n        raise ValueError(\n            \"The connection_string secret for bigquery must be a service-account JSON key \"\n            \"with client_email and project_id.\"\n        )\n    return info\n\n\nasync def _run_postgresql(connection_string: str, sql: str, read: bool, max_rows: int) -> dict:\n    import asyncpg\n\n    try:\n        connection = await asyncpg.connect(connection_string)\n    except Exception as exc:\n        raise _connect_failed(\"postgresql\", exc) from None\n    try:\n        if read:\n            statement = await connection.prepare(sql)\n            columns = [attribute.name for attribute in statement.get_attributes()]\n            records = await statement.fetch()\n            return _rows(columns, [tuple(record.values()) for record in records], max_rows)\n        status = await connection.execute(sql)\n        tail = str(status or \"\").rsplit(\" \", 1)[-1]\n        return _affected(int(tail) if tail.isdigit() else 0)\n    finally:\n        await connection.close()\n\n\nasync def _run_sqlite(uri: str, sql: str, read: bool, max_rows: int) -> dict:\n    import aiosqlite\n\n    try:\n        connection = await aiosqlite.connect(uri, uri=True)\n    except Exception as exc:\n        raise _connect_failed(\"sqlite\", exc) from None\n    try:\n        cursor = await connection.execute(sql)\n        if read:\n            columns = [item[0] for item in cursor.description or ()]\n            records = await cursor.fetchmany(max_rows + 1) if columns else []\n            await connection.commit()\n            return _rows(columns, records, max_rows)\n        await connection.commit()\n        return _affected(cursor.rowcount)\n    finally:\n        await connection.close()\n\n\nasync def _run_mssql(dsn: str, sql: str, read: bool, max_rows: int) -> dict:\n    import aioodbc\n\n    try:\n        connection = await aioodbc.connect(dsn=dsn)\n    except Exception as exc:\n        raise _connect_failed(\"mssql\", exc) from None\n    try:\n        cursor = await connection.cursor()\n        try:\n            await cursor.execute(sql)\n            if read:\n                columns = [item[0] for item in cursor.description or ()]\n                records = await cursor.fetchmany(max_rows + 1) if columns else []\n                await connection.commit()\n                return _rows(columns, records, max_rows)\n            await connection.commit()\n            return _affected(cursor.rowcount)\n        finally:\n            await cursor.close()\n    finally:\n        await connection.close()\n\n\ndef _run_bigquery(info: dict, sql: str, read: bool, max_rows: int) -> dict:\n    \"\"\"Blocking: the BigQuery client is synchronous, so this runs in a worker thread.\"\"\"\n    from google.cloud import bigquery\n    from google.oauth2 import service_account\n\n    try:\n        credentials = service_account.Credentials.from_service_account_info(info)\n        client = bigquery.Client(credentials=credentials, project=info[\"project_id\"])\n    except Exception as exc:\n        raise _connect_failed(\"bigquery\", exc) from None\n    try:\n        job = client.query(sql)\n        if read:\n            result = job.result(max_results=max_rows + 1)\n            columns = [field.name for field in result.schema]\n            return _rows(columns, [tuple(row.values()) for row in result], max_rows)\n        job.result()\n        return _affected(job.num_dml_affected_rows)\n    finally:\n        client.close()\n\n\nasync def _run_external(db_type: str, target, sql: str, read: bool, max_rows: int) -> dict:\n    if db_type == \"postgresql\":\n        return await _run_postgresql(target, sql, read, max_rows)\n    if db_type == \"sqlite\":\n        return await _run_sqlite(target, sql, read, max_rows)\n    if db_type == \"mssql\":\n        return await _run_mssql(target, sql, read, max_rows)\n    return await asyncio.to_thread(_run_bigquery, target, sql, read, max_rows)\n\n\nasync def _run_platform(\n    database_id: str, sql: str, read: bool, read_only: bool, max_rows: int\n) -> dict:\n    # The platform answers a write with the rows it returns, not a status line,\n    # so RETURNING 1 is what makes the affected-row count real. The newline ends\n    # any trailing -- comment in a configured clause. A write past the row cap\n    # reports truncated, so its row_count is a floor rather than the total.\n    statement = sql if read else sql + \"\\nRETURNING 1\"\n    limit = max_rows if read else _MAX_ROWS_CAP\n    db = await perceivo.managed_service.database.connect(database_id)\n    result = await db.query(statement, read_only=read_only and read, max_rows=limit)\n    truncated = bool(result.get(\"truncated\"))\n    if not read:\n        return _affected(len(result.get(\"rows\") or []), truncated)\n    columns = list(result.get(\"columns\") or [])\n    rows = [\n        dict(zip(columns, row, strict=True)) if isinstance(row, (list, tuple)) else row\n        for row in result.get(\"rows\") or []\n    ]\n    return {\"columns\": columns, \"rows\": rows, \"row_count\": len(rows), \"truncated\": truncated}\n\n\ndef _error(operation: str, message: str, error_type: str) -> \"perceivo.primitives.AgentOutput\":\n    \"\"\"A refusal the flow can branch on: the database answered, but said no.\n\n    The payload variable is named uniquely so the contract validator can see\n    this literal's fields; reusing one name across payloads hides them.\n    \"\"\"\n    perceivo.log.warning(f\"Database Connector: {operation} refused ({error_type})\")\n    error_payload = {\n        \"success\": False,\n        \"operation\": operation,\n        \"error\": message,\n        \"error_type\": error_type,\n    }\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=error_payload,\n            mime_type=\"application/json\",\n        ),\n        response_data=error_payload,\n    )\n\n\n@perceivo.agent\nasync def database_connector(\n    input: perceivo.primitives.AgentInput,\n) -> perceivo.primitives.AgentOutput:\n    \"\"\"Run one SQL statement against a platform-provisioned or an external database.\n\n    The statement is built from the node parameters (or is the Custom SQL), with\n    ${field} placeholders resolved from request_data as quoted literals. Platform\n    mode queries a database the platform provisioned, through the platform;\n    external mode connects with the connection_string secret, read by NAME.\n\n    Every setting is checked before anything is sent, and a bad one raises\n    ValueError. A platform refusal -- no privilege (403) or the database is not\n    running (409) -- is returned as a result with success false. Any other\n    failure raises and fails the run. Neither the SQL nor any row is logged.\n    \"\"\"\n    request_data = input.request_data or {}\n    if not isinstance(request_data, dict):\n        raise ValueError(\"request_data must be an object.\")\n\n    operation = _choice(\"operation\", \"SELECT\", _OPERATIONS, \"Operation\", upper=True)\n    mode = _choice(\"connection_mode\", \"platform\", _MODES, \"Connection Mode\")\n    db_type = \"postgresql\"\n    if mode == \"external\":\n        db_type = _choice(\"db_type\", \"postgresql\", _DB_TYPES, \"Database Type\")\n    max_rows = _max_rows()\n\n    sql = _build_query(operation, request_data, db_type, max_rows + 1)\n    # read: the result is rows (SELECT, CUSTOM), not an affected-row count.\n    # read_only: whether the platform may refuse a write; CUSTOM goes by its verb.\n    read = operation in (\"SELECT\", \"CUSTOM\")\n    read_only = operation == \"SELECT\"\n    if operation == \"CUSTOM\":\n        first_word = (sql.lstrip(\"( \\t\\r\\n\").split(None, 1) or [\"\"])[0].upper()\n        read_only = first_word in _READ_KEYWORDS\n\n    if mode == \"platform\":\n        target = _param(\"platform_database_id\")\n        if not target:\n            raise ValueError(\"Connection Mode is platform but no Database ID is set.\")\n    else:\n        connection_string = await perceivo.secrets.get(\"connection_string\")\n        if not connection_string:\n            raise ValueError(\n                \"Connection Mode is external but no connection_string secret is bound. \"\n                \"Bind one on the orchestration node.\"\n            )\n        if db_type == \"mssql\":\n            target = _mssql_dsn(connection_string)\n        elif db_type == \"sqlite\":\n            target = _sqlite_uri(connection_string)\n        elif db_type == \"bigquery\":\n            target = _bigquery_credentials(connection_string)\n        else:\n            target = connection_string\n\n    perceivo.log.info(\n        f\"Database Connector: {operation} ({mode} {db_type})\",\n        operation=operation,\n        connection_mode=mode,\n        db_type=db_type,\n        read_only=read_only,\n    )\n\n    if mode == \"platform\":\n        try:\n            result = await _run_platform(target, sql, read, read_only, max_rows)\n        except Exception as exc:\n            status = getattr(getattr(exc, \"response\", None), \"status_code\", None)\n            if status == 403:\n                return _error(\n                    operation,\n                    \"Access denied: you lack the database privilege this operation needs.\",\n                    \"PermissionError\",\n                )\n            if status == 409:\n                return _error(\n                    operation,\n                    \"The database is not running. Start it from the Infrastructure tab.\",\n                    \"ServiceUnavailable\",\n                )\n            raise\n    else:\n        result = await _run_external(db_type, target, sql, read, max_rows)\n\n    perceivo.log.info(\n        f\"Database Connector: {operation} completed\",\n        row_count=result[\"row_count\"],\n        truncated=result[\"truncated\"],\n    )\n\n    # Each exit builds its own literal payload so every field this agent can\n    # return is statically visible to the contract validator.\n    if read:\n        response_field = _param(\"response_field_name\")\n        if response_field:\n            # The rows under the configured key, merged into what arrived, so\n            # they flow on through a Sequential Executor chain.\n            wrapped_payload = {**request_data, response_field: result[\"rows\"]}\n            return perceivo.primitives.AgentOutput(\n                artifact=perceivo.primitives.Artifact(\n                    type=perceivo.primitives.ArtifactType.JSON,\n                    data=wrapped_payload,\n                    mime_type=\"application/json\",\n                ),\n                response_data=wrapped_payload,\n            )\n        read_payload = {\n            \"success\": True,\n            \"operation\": operation,\n            \"rows\": result[\"rows\"],\n            \"row_count\": result[\"row_count\"],\n            \"columns\": result[\"columns\"],\n            \"truncated\": result[\"truncated\"],\n        }\n        return perceivo.primitives.AgentOutput(\n            artifact=perceivo.primitives.Artifact(\n                type=perceivo.primitives.ArtifactType.JSON,\n                data=read_payload,\n                mime_type=\"application/json\",\n            ),\n            response_data=read_payload,\n        )\n\n    affected_rows = result[\"row_count\"]\n    # Past the row cap the count is a floor, not the total.\n    capped = \" (at least; the count was capped)\" if result[\"truncated\"] else \"\"\n    write_payload = {\n        \"success\": True,\n        \"operation\": operation,\n        \"rows\": [],\n        \"row_count\": affected_rows,\n        \"columns\": [],\n        \"truncated\": result[\"truncated\"],\n        \"affected_rows\": affected_rows,\n        \"message\": f\"{affected_rows} rows affected{capped}\",\n    }\n    return perceivo.primitives.AgentOutput(\n        artifact=perceivo.primitives.Artifact(\n            type=perceivo.primitives.ArtifactType.JSON,\n            data=write_payload,\n            mime_type=\"application/json\",\n        ),\n        response_data=write_payload,\n    )\n",
+    "short_description": "Runs one SQL statement against a platform-provisioned database or your own PostgreSQL, SQL Server, SQLite or BigQuery.",
+    "tags": [
+      "template",
+      "database",
+      "sql",
+      "external"
+    ],
+    "template_source_id": null
+  },
+  "export_type": "component",
+  "export_version": "1.0",
+  "exported_at": "2026-07-18T02:12:16.141481Z"
+}
